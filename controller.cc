@@ -63,7 +63,7 @@ Controller::HandlePacketIn (
 {
   NS_LOG_FUNCTION (this << swtch << xid);
 
-  static int prio = 100;
+  /*static int prio = 100;
   uint32_t outPort = OFPP_FLOOD;
   enum ofp_packet_in_reason reason = msg->reason;
 
@@ -183,7 +183,7 @@ Controller::HandlePacketIn (
     {
       NS_LOG_WARN ("This controller can't handle the packet. Unkwnon reason.");
     }
-
+  */
   // All handlers must free the message when everything is ok
   ofl_msg_free ((struct ofl_msg_header*)msg, 0);
   return 0;
@@ -237,6 +237,12 @@ Controller::HandshakeSuccessful (
   DpctlExecute (swDpId, "flow-mod cmd=add,table=0,prio=0 "
                 "apply:output=ctrl:128");
 
+
+  //Flooding all ARP packets
+  DpctlExecute (swDpId, "flow-mod cmd=add,table=0,prio=10 eth_type=0x0806 "
+                "apply:output=flood");
+
+
   // Configure te switch to buffer packets and send only the first 128 bytes of
   // each packet sent to the controller when not using an output action to the
   // OFPP_CONTROLLER logical port.
@@ -251,6 +257,95 @@ Controller::HandshakeSuccessful (
       NS_LOG_ERROR ("Table exists for this datapath.");
     }
 }
+
+
+void 
+Controller::NotifyTopology(TopologyIfaces_t slice_interfaces, 
+  TopologyPorts_t switch_ports){
+
+  //Go through slices
+  for(size_t sl = 0; sl < slice_interfaces.size(); sl++){
+
+    //Switch between HostsSWA/HostsSWB/Servers
+    for(size_t sw = 0; sw < 3; sw++){
+
+      for(size_t iface = 0; iface < slice_interfaces[sl][sw].GetN(); iface++){
+
+        //Address/Port pair
+        Ipv4Address address = slice_interfaces[sl][sw].GetAddress(iface);
+        Ptr<OFSwitch13Port> port = switch_ports[sl][sw][iface];
+
+        //Install the rule on switches
+        std::ostringstream cmd;
+        cmd << "flow-mod cmd=add,table=0,prio=1000"
+        << " eth_type=0x0800,ip_dst=" << address
+        << " apply:output=" << port->GetPortNo();
+        DpctlExecute (port->GetSwitchDevice()->GetDpId(), cmd.str ());
+
+        std::cout << cmd.str() << std::endl;
+
+      }
+    }
+
+
+
+    
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    /*std::cout << "HOSTS SWA SLICE " << i << ": " << std::endl;
+    for(size_t j = 0; j < slice_interfaces[i][0].GetN(); j++)
+      std::cout << slice_interfaces[i][0].GetAddress(j) << std::endl;
+
+
+    std::cout << "HOSTS SWB SLICE " << i << ": " << std::endl;
+    for(size_t j = 0; j < slice_interfaces[i][1].GetN(); j++)
+      std::cout << slice_interfaces[i][1].GetAddress(j) << std::endl;
+
+
+    std::cout << "HOSTS SERVERS SLICE " << i << ": " << std::endl;
+    for(size_t j = 0; j < slice_interfaces[i][2].GetN(); j++)
+      std::cout << slice_interfaces[i][2].GetAddress(j) << std::endl;
+
+
+    for(size_t j = 0; j < switch_ports[i][0].size(); j++){
+
+      std::cout << "SLICE " << i << " PORTAS SWA : ";
+      std::cout << switch_ports[i][0][j]->GetPortNo() << std::endl;
+    }
+    std::cout << "----------------" << std::endl;
+
+    for(size_t j = 0; j < switch_ports[i][1].size(); j++){
+      std::cout << "SLICE " << i << " PORTAS SWB : ";
+      std::cout << switch_ports[i][1][j]->GetPortNo() << std::endl;
+    }
+    std::cout << "----------------" << std::endl;
+
+    for(size_t j = 0; j < switch_ports[i][2].size(); j++){
+      std::cout << "SLICE " << i << " PORTAS SERVERS : ";
+      std::cout << switch_ports[i][2][j]->GetPortNo() << std::endl;
+    }
+
+    std::cout << "----------------" << std::endl;*/
+
+  }
+
+}
+
 
 } // namespace ns3
 #endif // NS3_OFSWITCH13

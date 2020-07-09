@@ -20,8 +20,14 @@
 #define CONTROLLER_H
 
 #include <ns3/ofswitch13-controller.h>
+#include <ns3/internet-module.h>
+#include <ns3/ofswitch13-module.h>
 
 namespace ns3 {
+
+typedef std::vector<Ptr<OFSwitch13Port>> PortsVector_t;
+typedef std::vector<std::vector<PortsVector_t>> TopologyPorts_t;
+typedef std::vector<std::vector<Ipv4InterfaceContainer>> TopologyIfaces_t;
 
 /**
  * \ingroup ofswitch13
@@ -67,6 +73,22 @@ public:
   ofl_err HandleFlowRemoved (
     struct ofl_msg_flow_removed *msg, Ptr<const RemoteSwitch> swtch,
     uint32_t xid);
+
+
+
+  /**
+   * Notify the controller that all nodes have been configured
+   * such as the ports on the switches.
+   *
+   * \param slice_interfaces The vector that contains the info about nodes addressing.
+   * \param switch_ports The vector that contains the pointer to each port on switches.
+   * \return void.
+   */
+  void NotifyTopology(
+    TopologyIfaces_t slice_interfaces,
+    TopologyPorts_t switch_ports);
+
+
 
 protected:
   // Inherited from OFSwitch13Controller
