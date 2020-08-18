@@ -23,11 +23,16 @@
 #include <ns3/internet-module.h>
 #include <ns3/ofswitch13-module.h>
 
+#include "link-info.h"
+#include "qos-queue.h"
+
 namespace ns3 {
 
-typedef std::vector<Ptr<OFSwitch13Port>> PortsVector_t;
-typedef std::vector<std::vector<PortsVector_t>> TopologyPorts_t;
-typedef std::vector<std::vector<Ipv4InterfaceContainer>> TopologyIfaces_t;
+class LinkInfo;
+
+typedef std::vector<Ptr<OFSwitch13Port> > PortsVector_t;
+typedef std::vector<std::vector<PortsVector_t> > TopologyPorts_t;
+typedef std::vector<std::vector<Ipv4InterfaceContainer> > TopologyIfaces_t;
 
 /**
  * \ingroup ofswitch13
@@ -48,18 +53,7 @@ public:
   /** Destructor implementation */
   virtual void DoDispose ();
 
-  /**
-   * Handle packet-in messages sent from switch to this controller. Look for L2
-   * switching information, update the structures and send a packet-out back.
-   *
-   * \param msg The packet-in message.
-   * \param swtch The switch information.
-   * \param xid Transaction id.
-   * \return 0 if everything's ok, otherwise an error number.
-   */
-  ofl_err HandlePacketIn (
-    struct ofl_msg_packet_in *msg, Ptr<const RemoteSwitch> swtch,
-    uint32_t xid);
+
 
   /**
    * Handle flow removed messages sent from switch to this controller. Look for
@@ -84,10 +78,63 @@ public:
    * \param switch_ports The vector that contains the pointer to each port on switches.
    * \return void.
    */
-  void NotifyTopology(
-    TopologyIfaces_t slice_interfaces,
-    TopologyPorts_t switch_ports);
+  void NotifyClientsServers (
+    TopologyIfaces_t sliceInterfaces,
+    TopologyPorts_t switchPorts);
 
+
+
+  /**
+   * Notify the controller that all switches have been configured
+   * so it can install the respectives rules.
+   *
+   * \param interSwitchesPorts Vector that contains the Pointers to the ports between the switches.
+   * \param switchDevices Container responsible to store de Devices of each switch.
+   * \return void.
+   */
+  void
+  NotifySwitches (PortsVector_t interSwitchesPorts,
+                  OFSwitch13DeviceContainer switchDevices);
+
+  /**
+   * Install the meters for each slice into Meter Table.
+   * 
+   * \param sliceQuotas Vector that contains the slice quotas.
+   * \return void.
+   */
+  void
+  ConfigureMeters (std::vector<int> sliceQuotas);
+
+  /**
+   * Apply the infrastructure inter-slicing OpenFlow meters.
+   * \param swtch The switch information.
+   * \param slice The network slice.
+   */
+  void SlicingMeterApply (Ptr<LinkInfo> lInfo, int sliceId);
+
+  /**
+   * Adjust the infrastructure inter-slicing OpenFlow meter, depending on the
+   * MeterStep attribute value and current link configuration.
+   * \param lInfo The link information.
+   * \param slice The network slice.
+   */
+  void SlicingMeterAdjust (Ptr<LinkInfo> lInfo, int sliceId);
+
+  /**
+   * Install the infrastructure inter-slicing OpenFlow meters.
+   * \param lInfo The link information.
+   * \param slice The network slice.
+   */
+  void SlicingMeterInstall (Ptr<LinkInfo> lInfo, int sliceId);
+
+  /**
+   * \name Attribute accessors.
+   * \return The requested information.
+   */
+  //\{
+  SliceMode GetInterSliceMode     (void) const;
+  OpMode    GetSpareUseMode       (void) const;
+  //\}
 
 
 protected:
@@ -95,6 +142,19 @@ protected:
   void HandshakeSuccessful (Ptr<const RemoteSwitch> swtch);
 
 private:
+  //Poiters to link infos
+  Ptr<LinkInfo> m_lInfoA;
+  Ptr<LinkInfo> m_lInfoB;
+
+  DataRate              m_extraStep;      //!< Extra adjustment step.
+  DataRate              m_guardStep;      //!< Dynamic slice link guard.
+  DataRate              m_meterStep;      //!< Meter adjustment step.
+  SliceMode             m_sliceMode;      //!< Inter-slicing operation mode.
+  Time                  m_sliceTimeout;   //!< Dynamic slice timeout interval.
+  OpMode                m_spareUse;       //!< Spare bit rate sharing mode.
+
+  size_t m_numberSlices;
+
   /** Map saving <IPv4 address / MAC address> */
   typedef std::map<Ipv4Address, Mac48Address> IpMacMap_t;
   IpMacMap_t m_arpTable; //!< ARP resolution table.

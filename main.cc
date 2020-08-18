@@ -37,41 +37,42 @@
 #include <ns3/csma-module.h>
 #include <ns3/internet-module.h>
 #include <ns3/ofswitch13-module.h>
-#include <ns3/internet-apps-module.h>
+#include <ns3/applications-module.h>
 #include <ns3/netanim-module.h>
 #include <ns3/mobility-module.h>
 
 #include <boost/algorithm/string/replace.hpp>
 #include <string>
-
 #include "controller.h"
+#include "my-application-helper.h"
 
 
 using namespace ns3;
 
 
-typedef std::vector<std::vector<NodeContainer>> TopologyNodes_t;
-typedef std::vector<std::vector<NetDeviceContainer>> TopologyNetDevices_t;
-
+typedef std::vector<std::vector<NodeContainer> > TopologyNodes_t;
+typedef std::vector<std::vector<NetDeviceContainer> > TopologyNetDevices_t;
 
 
 //Print vectors with the switch ports information
-void printPorts();
+void printPorts ();
 
 //Set animation configurations
-void create_animation();
+void createAnimation ();
 
-void configure_switches();
+void configureSwitches ();
 
-void configure_slices(std::string config);
+void configureSlices (std::string config);
 
-void EnableOfsLogs (bool);
+//Enable the log functions
+void EnableVerbose (bool enable);
+void EnableOfsLogs (bool enable);
 
 
 //Global variables
 
 //NetAnim or not
-bool create_anim = false;
+bool createAnim = false;
 
 
 //Variables storing the topology config
@@ -83,13 +84,14 @@ size_t numberHosts = 0;
 
 
 //Vectors to allocate the ports of the switches
-TopologyPorts_t switch_ports;
+TopologyPorts_t switchPorts;
 PortsVector_t interSwitchesPorts;
 
 //Containers that will store Node, NetDevice and Interface objects
-TopologyNodes_t slice_nodes;
-TopologyNetDevices_t slice_netDevices;
-TopologyIfaces_t slice_interfaces;
+std::vector<int> sliceQuotas;
+TopologyNodes_t sliceNodes;
+TopologyNetDevices_t sliceNetDevices;
+TopologyIfaces_t sliceInterfaces;
 NodeContainer switches;
 
 
@@ -115,7 +117,10 @@ static ns3::GlobalValue
 
 int
 main (int argc, char *argv[])
-{ 
+{
+
+  // Customizing the OpenFlow queue type on switch ports.
+  Config::SetDefault ("ns3::OFSwitch13Port::QueueFactory", StringValue ("ns3::QosQueue"));
 
   Config::SetDefault ("ns3::CsmaChannel::FullDuplex", BooleanValue (true));
 
@@ -126,7 +131,7 @@ main (int argc, char *argv[])
   bool trace = false;
   bool ofsLog   = false;
 
-  //Must be in format = "na:nb|na:nb|na:nb". 'na' being number of hosts attached to switch 
+  //Must be in format = "na:nb|na:nb|na:nb". 'na' being number of hosts attached to switch
   //end 'nb' being the number of hosts attached to switch B. The streches indicates which slice
   //hosts belong to.
   std::string config = "";
@@ -135,86 +140,201 @@ main (int argc, char *argv[])
   // Configure command line parameters
   CommandLine cmd;
   cmd.AddValue ("SimTime", "Simulation time (seconds)", simTime);
-  cmd.AddValue ("verbose", "Enable verbose output", verbose);
+  cmd.AddValue ("Verbose", "Enable verbose output", verbose);
   cmd.AddValue ("Trace", "Enable datapath stats and pcap traces", trace);
-  cmd.AddValue ("Create_anim", "Enable netAnim", create_anim);
+  cmd.AddValue ("createAnim", "Enable netAnim", createAnim);
   cmd.AddValue ("Config", "Configure slices and their hosts", config);
   cmd.AddValue ("OfsLog",   "Enable ofsoftswitch13 logs.", ofsLog);
   cmd.Parse (argc, argv);
 
 
-
-  if (verbose)
-    {
-      OFSwitch13Helper::EnableDatapathLogs ();
-      LogComponentEnable ("OFSwitch13Interface", LOG_LEVEL_ALL);
-      LogComponentEnable ("OFSwitch13Device", LOG_LEVEL_ALL);
-      LogComponentEnable ("OFSwitch13Port", LOG_LEVEL_ALL);
-      LogComponentEnable ("OFSwitch13Queue", LOG_LEVEL_ALL);
-      LogComponentEnable ("OFSwitch13SocketHandler", LOG_LEVEL_ALL);
-      LogComponentEnable ("OFSwitch13Controller", LOG_LEVEL_ALL);
-      LogComponentEnable ("OFSwitch13LearningController", LOG_LEVEL_ALL);
-      LogComponentEnable ("OFSwitch13Helper", LOG_LEVEL_ALL);
-      LogComponentEnable ("OFSwitch13InternalHelper", LOG_LEVEL_ALL);
-    }
-
   // Enable checksum computations (required by OFSwitch13 module)
   GlobalValue::Bind ("ChecksumEnabled", BooleanValue (true));
 
   //Enable OfsLogs or not
+
   EnableOfsLogs (ofsLog);
+  EnableVerbose (verbose);
 
   controllerNode = CreateObject<Node> ();
 
-  if(config.size() != 0){
-    configure_switches();
-    configure_slices(config);
-    controllerApp->NotifyTopology(slice_interfaces, switch_ports);
-  }
- 
+  if (config.size () != 0)
+    {
+
+      configureSwitches ();
+      controllerApp->NotifySwitches (interSwitchesPorts, switchDevices);
+
+      configureSlices (config);
+      controllerApp->NotifyClientsServers (sliceInterfaces, switchPorts);
+
+      controllerApp->ConfigureMeters (sliceQuotas);
+    }
+
 
   // Set the name for each host node.
-  for (size_t i = 0; i < numberSlices; i++){ 
-      
+  for (size_t i = 0; i < numberSlices; i++)
+    {
+
       std::string NameHosts;
       std::string NameServers;
 
-      for(size_t j = 0; j < slice_nodes[i][0].GetN(); j++){
-        NameHosts = "Slice" + std::to_string(i) + "hostSWA" + std::to_string(j+1);
-        Names::Add (NameHosts, slice_nodes[i][0].Get (j));
-      }
-      
-      for(size_t j = 0; j < slice_nodes[i][1].GetN(); j++){
-        NameHosts = "Slice" + std::to_string(i) + "hostSWB" + std::to_string(j+1);
-        Names::Add (NameHosts, slice_nodes[i][1].Get (j));
-      }
+      for (size_t j = 0; j < sliceNodes[i][HOSTS_SWA].GetN (); j++)
+        {
+          NameHosts = "Slice" + std::to_string (i) + "hostSWA" + std::to_string (j + 1);
+          Names::Add (NameHosts, sliceNodes[i][HOSTS_SWA].Get (j));
+        }
 
-      for(size_t j = 0; j < slice_nodes[i][2].GetN(); j++){
-        NameServers = "Slice" + std::to_string(i) + "server" + std::to_string(j+1);
-        Names::Add (NameServers, slice_nodes[i][2].Get (j));
-      }
-   
-  }
+      for (size_t j = 0; j < sliceNodes[i][HOSTS_SWB].GetN (); j++)
+        {
+          NameHosts = "Slice" + std::to_string (i) + "hostSWB" + std::to_string (j + 1);
+          Names::Add (NameHosts, sliceNodes[i][HOSTS_SWB].Get (j));
+        }
 
-
-  //Configure ping application between hosts
-  ApplicationContainer pingApps;
-
-  for(size_t i = 0; i < numberSlices; i++){
-
-
-    for(size_t j = 0; j < slice_interfaces[i][2].GetN(); j++){ //Server Interfaces
-
-      V4PingHelper pingHelper = V4PingHelper (slice_interfaces[i][2].GetAddress (j));
-      pingHelper.SetAttribute ("Verbose", BooleanValue (true));
-      pingApps = pingHelper.Install (slice_nodes[i][3].Get(j));
-      pingApps.Start (Seconds (1));
+      for (size_t j = 0; j < sliceNodes[i][SERVERS].GetN (); j++)
+        {
+          NameServers = "Slice" + std::to_string (i) + "server" + std::to_string (j + 1);
+          Names::Add (NameServers, sliceNodes[i][SERVERS].Get (j));
+        }
 
     }
 
+
+  MyApplicationHelper appHelper;
+  ApplicationContainer apps;
+  
+  for (size_t i = 0; i < numberSlices; i++){
+    for (size_t j = 0; j < sliceNodes[i][ALL_HOSTS].GetN (); j++)
+      { 
+
+        apps.Add(appHelper.Install(sliceNodes[i][ALL_HOSTS].Get (j), sliceNodes[i][SERVERS].Get (j), 
+        sliceInterfaces[i][ALL_HOSTS].GetAddress (j), sliceInterfaces[i][SERVERS].GetAddress (j), 
+        9, 9, Ipv4Header::DSCP_AF32));
+
+      }
   }
-  
-  
+
+  apps.Start(Seconds (2.0));
+
+  //
+  // Create a UdpEchoServer application.
+  //
+  /*ApplicationContainer apps;
+  uint16_t port = 9;
+  uint32_t MaxPacketSize = 1024;
+  uint32_t maxPacketCount = 320;
+  Time interPacketInterval = Seconds (0.05);
+
+  for (size_t i = 0; i < numberSlices; i++)
+    {
+
+      //Set the servers up
+      for (size_t j = 0; j < sliceNodes[i][SERVERS].GetN (); j++)
+        {
+          UdpEchoServerHelper server (port);
+          apps = server.Install (sliceNodes[i][SERVERS].Get (j));
+          apps.Start (Seconds (1.0));
+          apps.Stop (Seconds (10.0));
+        }
+
+      //Set the clients up
+      for (size_t j = 0; j < sliceNodes[i][SERVERS].GetN (); j++)
+        {
+          UdpEchoClientHelper client (sliceInterfaces[i][SERVERS].GetAddress (j), port);
+          client.SetAttribute ("MaxPackets", UintegerValue (maxPacketCount));
+          client.SetAttribute ("Interval", TimeValue (interPacketInterval));
+          client.SetAttribute ("PacketSize", UintegerValue (MaxPacketSize));
+          apps = client.Install (sliceNodes[i][ALL_HOSTS].Get (j));
+          apps.Start (Seconds (2.0));
+          apps.Stop (Seconds (10.0));
+        }
+
+    }*/
+
+  // Create the OnOff applications to send data to the UDP receiver
+  /*ApplicationContainer onOffApps;
+  uint16_t port = 9;
+
+  Address sinkLocalAddress (InetSocketAddress (Ipv4Address::GetAny (), port));
+  PacketSinkHelper sinkHelper ("ns3::UdpSocketFactory", sinkLocalAddress);
+  ApplicationContainer sinkApp;
+
+  for (size_t i = 0; i < numberSlices; i++)
+    {
+      for (size_t j = 0; j < sliceNodes[i][SERVERS].GetN (); j++)
+        {
+
+          sinkApp.Add (sinkHelper.Install (sliceNodes[i][SERVERS].Get (j)));
+
+          //Set DSCP field
+          InetSocketAddress serverInetAddr (sliceInterfaces[i][SERVERS].GetAddress (j), port);
+          serverInetAddr.SetTos (15);
+
+          OnOffHelper onOffHelper ("ns3::UdpSocketFactory", serverInetAddr);
+          onOffHelper.SetConstantRate (DataRate ("448kb/s"));
+          onOffApps.Add (onOffHelper.Install (sliceNodes[i][ALL_HOSTS].Get (j)));
+
+        }
+    }
+
+  sinkApp.Start (Seconds (1.0));
+  sinkApp.Stop (Seconds (10.0));
+
+  onOffApps.Start (Seconds (2.0));
+  onOffApps.Stop (Seconds (9.0));*/
+
+  //Configure an UDP-CLIENT-SERVER application
+  /*ApplicationContainer apps;
+  uint16_t port = 4000;
+  uint32_t MaxPacketSize = 1024;
+  uint32_t maxPacketCount = 320;
+  Time interPacketInterval = Seconds (0.05);
+
+  for (size_t i = 0; i < numberSlices; i++)
+    {
+
+      //Set the servers up
+      for(size_t j = 0; j < sliceNodes[i][SERVERS].GetN(); j++){
+        UdpServerHelper server (port);
+        apps = server.Install (sliceNodes[i][SERVERS].Get(j));
+        apps.Start (Seconds (1.0));
+        apps.Stop (Seconds (10.0));
+      }
+
+      //Set the clients up
+      for (size_t j = 0; j < sliceNodes[i][SERVERS].GetN(); j++)
+        {
+          UdpClientHelper client (sliceInterfaces[i][SERVERS].GetAddress(j), port);
+          client.SetAttribute ("MaxPackets", UintegerValue (maxPacketCount));
+          client.SetAttribute ("Interval", TimeValue (interPacketInterval));
+          client.SetAttribute ("PacketSize", UintegerValue (MaxPacketSize));
+          apps = client.Install (sliceNodes[i][ALL_HOSTS].Get(j));
+          apps.Start (Seconds (2.0));
+          apps.Stop (Seconds (10.0));
+        }
+
+    }*/
+
+
+  //Configure ping application between hosts
+  /*ApplicationContainer pingApps;
+
+  for (size_t i = 0; i < numberSlices; i++)
+    {
+
+
+      for (size_t j = 0; j < sliceInterfaces[i][SERVERS].GetN (); j++) //Server Interfaces
+
+        {
+          V4PingHelper pingHelper = V4PingHelper (sliceInterfaces[i][SERVERS].GetAddress (j));
+          pingHelper.SetAttribute ("Verbose", BooleanValue (true));
+          pingApps = pingHelper.Install (sliceNodes[i][ALL_HOSTS].Get (j));
+          pingApps.Start (Seconds (1));
+
+        }
+
+    }*/
+
+
   // Enable datapath stats and pcap traces at hosts, switch(es), and controller(s)
   if (trace)
     {
@@ -222,21 +342,28 @@ main (int argc, char *argv[])
       of13Helper->EnableDatapathStats ("switch-stats");
       //csmaHelperinterSwitchesPorts.EnablePcapAll("logPcap", true);
 
-      for(size_t i = 0; i < numberSlices; i++){
+      for (size_t i = 0; i < numberSlices; i++)
+        {
 
-        for(size_t j = 0; j < slice_nodes[i][0].GetN(); j++)
-          csmaHelperinterSwitchesPorts.EnablePcap ("hostSWA", slice_netDevices[i][0], true);
+          for (size_t j = 0; j < sliceNodes[i][HOSTS_SWA].GetN (); j++)
+            {
+              csmaHelperinterSwitchesPorts.EnablePcap ("hostSWA", sliceNetDevices[i][0], true);
+            }
 
-        for(size_t j = 0; j < slice_nodes[i][1].GetN(); j++)
-          csmaHelperinterSwitchesPorts.EnablePcap ("hostSWB", slice_netDevices[i][1], true);
+          for (size_t j = 0; j < sliceNodes[i][HOSTS_SWB].GetN (); j++)
+            {
+              csmaHelperinterSwitchesPorts.EnablePcap ("hostSWB", sliceNetDevices[i][1], true);
+            }
 
-        for(size_t j = 0; j < slice_nodes[i][2].GetN(); j++)
-          csmaHelperinterSwitchesPorts.EnablePcap ("server", slice_netDevices[i][2], true);
-      }
+          for (size_t j = 0; j < sliceNodes[i][SERVERS].GetN (); j++)
+            {
+              csmaHelperinterSwitchesPorts.EnablePcap ("server", sliceNetDevices[i][2], true);
+            }
+        }
 
-      
+
     }
-  
+
 
   //ArpCache::PopulateArpCaches ();
 
@@ -245,235 +372,303 @@ main (int argc, char *argv[])
   Simulator::Stop (Seconds (simTime));
   Simulator::Run ();
   Simulator::Destroy ();
+
 }
 
 
-void 
-printPorts(){
+void
+printPorts ()
+{
 
-  for(size_t i = 0; i < numberSlices; i++){
+  for (size_t i = 0; i < numberSlices; i++)
+    {
 
-    for(size_t j = 0; j < switch_ports[i][0].size(); j++){
+      for (size_t j = 0; j < switchPorts[i][HOSTS_SWA].size (); j++)
+        {
 
-      std::cout << "SLICE " << i << " PORTAS SWA : ";
-      std::cout << switch_ports[i][0][j]->GetPortNo() << std::endl;
+          std::cout << "SLICE " << i << " PORTAS SWA : ";
+          std::cout << switchPorts[i][HOSTS_SWA][j] -> GetPortNo () << std::endl;
+        }
+      std::cout << "----------------" << std::endl;
+
+      for (size_t j = 0; j < switchPorts[i][HOSTS_SWB].size (); j ++)
+        {
+          std::cout << "SLICE " << i << " PORTAS SWB : ";
+          std::cout << switchPorts[i][HOSTS_SWB][j] -> GetPortNo () << std::endl;
+        }
+      std::cout << "----------------" << std::endl;
+
+      for (size_t j = 0; j < switchPorts[i][SERVERS].size (); j ++)
+        {
+          std::cout << "SLICE " << i << " PORTAS SERVERS : ";
+          std::cout << switchPorts[i][SERVERS][j] -> GetPortNo () << std::endl;
+        }
+      std::cout << "----------------" << std::endl;
+
     }
-    std::cout << "----------------" << std::endl;
 
-    for(size_t j = 0; j < switch_ports[i][1].size(); j++){
-      std::cout << "SLICE " << i << " PORTAS SWB : ";
-      std::cout << switch_ports[i][1][j]->GetPortNo() << std::endl;
+
+  for (size_t i = 0; i < interSwitchesPorts.size (); i ++)
+    {
+      std::cout << " PORTAS INTER SWITCH : ";
+      std::cout << interSwitchesPorts[i] -> GetPortNo () << std::endl;
     }
-    std::cout << "----------------" << std::endl;
-
-    for(size_t j = 0; j < switch_ports[i][2].size(); j++){
-      std::cout << "SLICE " << i << " PORTAS SERVERS : ";
-      std::cout << switch_ports[i][2][j]->GetPortNo() << std::endl;
-    }
-    std::cout << "----------------" << std::endl;
-
-  }
-
-  
-  for(size_t i = 0; i < interSwitchesPorts.size(); i++){
-    std::cout << " PORTAS INTER SWITCH : ";
-    std::cout << interSwitchesPorts[i]->GetPortNo() << std::endl;
-  }
   std::cout << "----------------" << std::endl;
 
 }
 
-void 
-create_animation(){
+void
+createAnimation ()
+{
   // Create the animation object and configure for specified output
-  
-  if(create_anim){
 
-    Ptr<ListPositionAllocator> listPosAllocator;
-    listPosAllocator = CreateObject<ListPositionAllocator> ();
-    
+  if (createAnim)
+    {
 
-    listPosAllocator->Add (Vector (  75,  25, 0));  // switch A
-    listPosAllocator->Add (Vector (  100, 25, 0));  // switch B
-    listPosAllocator->Add (Vector ( 125, 25, 0));  // switch Servers
-    listPosAllocator->Add (Vector ( 100, 50, 0));  // controller
+      Ptr<ListPositionAllocator> listPosAllocator;
+      listPosAllocator = CreateObject<ListPositionAllocator> ();
 
 
-    NodeContainer all_hosts;
-    NodeContainer all_servers;
+      listPosAllocator->Add (Vector (  75,  25, 0));// switch A
+      listPosAllocator->Add (Vector (  100, 25, 0));// switch B
+      listPosAllocator->Add (Vector ( 125, 25, 0)); // switch Servers
+      listPosAllocator->Add (Vector ( 100, 50, 0)); // controller
 
-    int start = 0;
-    for(size_t i = 0; i < numberSlices; i++){
 
-      size_t j = 0;
+      NodeContainer allHosts;
+      NodeContainer allServers;
 
-      for (j = 0; j < slice_nodes[i][3].GetN(); j++) //Clients-hosts
-        listPosAllocator->Add (Vector (0, (start + 25 * j), 0)); 
+      int start = 0;
+      for (size_t i = 0; i < numberSlices; i ++)
+      {
 
-      for (j = 0; j < slice_nodes[i][2].GetN(); j++) //Servers
-        listPosAllocator->Add (Vector (200, (start + 25 * j), 0));
+        size_t j = 0;
 
-      start = start + (25 * j);
+        for (j = 0; j < sliceNodes[i][ALL_HOSTS].GetN (); j ++)  //Clients-hosts
+        {
+          listPosAllocator->Add (Vector (0, (start + 25 * j), 0));
+        }
 
-      all_hosts.Add(slice_nodes[i][3]);
-      all_servers.Add(slice_nodes[i][2]);
+        for (j = 0; j < sliceNodes[i][SERVERS].GetN (); j++)   //Servers
+          {
+            listPosAllocator->Add (Vector (200, (start + 25 * j), 0));
+          }
+
+        start = start + (25 * j);
+
+        allHosts.Add (sliceNodes[i][ALL_HOSTS]);
+        allServers.Add (sliceNodes[i][SERVERS]);
+      }
+
+
+
+      MobilityHelper mobilityHelper;
+      mobilityHelper.SetMobilityModel ("ns3::ConstantPositionMobilityModel");
+      mobilityHelper.SetPositionAllocator (listPosAllocator);
+      mobilityHelper.Install (NodeContainer (switches, controllerNode, allHosts, allServers));
+
     }
-
-  
-    
-    MobilityHelper mobilityHelper;
-    mobilityHelper.SetMobilityModel ("ns3::ConstantPositionMobilityModel");
-    mobilityHelper.SetPositionAllocator (listPosAllocator);
-    mobilityHelper.Install (NodeContainer (switches, controllerNode, all_hosts, all_servers));
-
-  }
 
 
 }
 
 
-void 
-configure_switches(){
+void
+configureSwitches ()
+{
 
   of13Helper = CreateObject<OFSwitch13InternalHelper>();
+  of13Helper->SetDeviceAttribute ("PipelineTables", UintegerValue (3));
 
-  switches.Create(3);
+  switches.Create (3);
 
-  
+  //To use in LinkInfo Ccreation
+  Ptr<CsmaNetDevice> currPortDev, nextPortDev;
+
   //Use the CsmaHelper to inter-connect switches
-  switchDevices = of13Helper->InstallSwitch(switches);
+  switchDevices = of13Helper->InstallSwitch (switches);
 
-  
-  csmaHelperinterSwitchesPorts.SetChannelAttribute ("DataRate", DataRateValue (DataRate ("1Gbps")));
+
+  csmaHelperinterSwitchesPorts.SetChannelAttribute ("DataRate", DataRateValue (DataRate ("100Mbps")));
   csmaHelperinterSwitchesPorts.SetChannelAttribute ("Delay", TimeValue (MilliSeconds (0)));
 
 
-  csmaHelperEndPoints.SetChannelAttribute ("DataRate", DataRateValue (DataRate ("1Gbps")));
+  csmaHelperEndPoints.SetChannelAttribute ("DataRate", DataRateValue (DataRate ("100Mbps")));
   csmaHelperEndPoints.SetChannelAttribute ("Delay", TimeValue (MilliSeconds (0)));
 
-  pairDevs = csmaHelperEndPoints.Install(switches.Get(0), switches.Get(1));
-  interSwitchesPorts.push_back(switchDevices.Get(0)->AddSwitchPort(pairDevs.Get(0)));
-  interSwitchesPorts.push_back(switchDevices.Get(1)->AddSwitchPort(pairDevs.Get(1)));
+  pairDevs = csmaHelperEndPoints.Install (switches.Get (0), switches.Get (1));
+  interSwitchesPorts.push_back (switchDevices.Get (0)->AddSwitchPort (pairDevs.Get (0)));
+  interSwitchesPorts.push_back (switchDevices.Get (1)->AddSwitchPort (pairDevs.Get (1)));
+
+  //Creating the LinkInfo object between SWA - SWB
+  Ptr<CsmaChannel> channelSwaSwb = DynamicCast<CsmaChannel> (pairDevs.Get (0)->GetChannel ());
+  CreateObject<LinkInfo> (interSwitchesPorts[0], interSwitchesPorts[1], channelSwaSwb);
 
 
-  pairDevs = csmaHelperEndPoints.Install(switches.Get(1), switches.Get(2));
-  interSwitchesPorts.push_back(switchDevices.Get(1)->AddSwitchPort(pairDevs.Get(0)));
-  interSwitchesPorts.push_back(switchDevices.Get(2)->AddSwitchPort(pairDevs.Get(1)));
+  pairDevs = csmaHelperEndPoints.Install (switches.Get (1), switches.Get (2));
+  interSwitchesPorts.push_back (switchDevices.Get (1)->AddSwitchPort (pairDevs.Get (0)));
+  interSwitchesPorts.push_back (switchDevices.Get (2)->AddSwitchPort (pairDevs.Get (1)));
 
+  //Creating the LinkInfo object between SWB - ServerSwitch
+  Ptr<CsmaChannel> channelSwbServerSw = DynamicCast<CsmaChannel> (pairDevs.Get (0)->GetChannel ());
+  CreateObject<LinkInfo> (interSwitchesPorts[2], interSwitchesPorts[3], channelSwbServerSw);
 
+  //Inicialize controller
+  controllerApp = CreateObject<Controller>();
+  of13Helper->InstallController (controllerNode, controllerApp);
+  of13Helper->CreateOpenFlowChannels ();
 
 }
 
 
-void 
-configure_slices(std::string config){
+void
+configureSlices (std::string config)
+{
 
 
 ///Parse the string first ------------
 
   std::string str = config;
-  std::string delimiter_switch = ":";
-  std::string delimiter_slice = "|";
+  std::string delimiterSwitch = ":";
+  std::string delimiterSlice = "|";
+  std::string delimiterQuota = ";";
 
-  size_t pos_slice = 0;
-  size_t pos_switch = 0;
-
+  size_t posSlice = 0;
+  size_t posSwitch = 0;
+  size_t posQuota = 0;
 
   std::string token;
-  std::string token_hosts;
-
-  pos_slice = str.find(delimiter_slice);
-  pos_switch = str.find(delimiter_switch);
+  std::string tokenHosts;
+  std::string tokenQuota;
 
   //Vectors to identify the number of each type of machines that compound the i slice
-  std::vector<int> numberHostsSWA_PerSlice;
-  std::vector<int> numberHostsSWB_PerSlice;
-  std::vector<int> numberServers_PerSlice;
-  int server_count;
+  std::vector<int> numberHostsSwaPerSlice;
+  std::vector<int> numberHostsSwbPerSlice;
+  std::vector<int> numberServersPerSlice;
+  int serverCount;
+
+  int maxQuota = 0;
 
   //Loop that extracts the info about the slice (e.g 3:1)
-  while ((pos_slice = str.find(delimiter_slice)) != std::string::npos) {
+  while ((posSlice = str.find (delimiterSlice)) != std::string::npos)
+    {
 
-    server_count = 0;
+      //Get the quota of the given slice
+      if ((posQuota = str.find (delimiterQuota)) != std::string::npos)
+        {
+
+          tokenQuota = str.substr (0, posQuota);
+          int intTokenQuota = stoi (tokenQuota);
+          sliceQuotas.push_back (intTokenQuota);
+          maxQuota += intTokenQuota;
+
+          NS_ASSERT_MSG (intTokenQuota >= 1, "Quota exceeded");
+          NS_ASSERT_MSG (maxQuota <= 100, "Quota exceeded");
+
+          str.erase (0, posQuota + delimiterQuota.length ());
+
+        }
+
+      serverCount = 0;
+
+      posSlice = str.find (delimiterSlice);
+      token = str.substr (0, posSlice);
+
+      //Loop that extracts the number of hosts attached to each switch.
+      while ((posSwitch = token.find (delimiterSwitch)) != std::string::npos)
+        {
+
+          tokenHosts = token.substr (0, posSwitch);
+
+          int intTokenHosts = stoi (tokenHosts);
+
+          numberHostsSWA = numberHostsSWA + intTokenHosts;
+
+          numberHostsSwaPerSlice.push_back (intTokenHosts);
+          serverCount = serverCount + intTokenHosts;
+
+          NS_ASSERT_MSG (intTokenHosts < 255, "Number of hostsSWA exceeded");
+
+          //std::cout << tokenHosts << std::endl;
+          token.erase (0, posSwitch + delimiterSwitch.length ());
+          //std::cout << token << std::endl;
+        }
 
 
-    token = str.substr(0, pos_slice);
-    //std::cout << token << std::endl;
+      //Extracts info of the last part of the string about the hosts
+      int intToken = stoi (token);
+      numberHostsSWB = numberHostsSWB + intToken;
 
-    //Loop that extracts the number of hosts attached to each switch.
-    while ((pos_switch = token.find(delimiter_switch)) != std::string::npos){
 
-      token_hosts = token.substr(0, pos_switch);
+      numberHostsSwbPerSlice.push_back (intToken);
+      serverCount += intToken;
 
-      int int_token_hosts = stoi(token_hosts);
+      NS_ASSERT_MSG (intToken < 255, "Number of hostsSWB exceeded");
 
-      numberHostsSWA = numberHostsSWA + int_token_hosts;
+      //std::cout << token << std::endl;
+      str.erase (0, posSlice + delimiterSlice.length ());
 
-      numberHostsSWA_PerSlice.push_back(int_token_hosts);
-      server_count = server_count + int_token_hosts;
+      numberSlices++;
 
-      NS_ASSERT_MSG(int_token_hosts < 255, "Number of hostsSWA exceeded");
+      NS_ASSERT_MSG (numberSlices < 254, "Number of slices exceeded");
 
-      //std::cout << token_hosts << std::endl;
-      token.erase(0, pos_switch + delimiter_switch.length());
+      numberServersPerSlice.push_back (serverCount);
+
     }
-
-
-    //Extracts info of the last part of the string about the hosts
-    int int_token = stoi(token);
-    numberHostsSWB = numberHostsSWB + int_token;
-
-    
-    numberHostsSWB_PerSlice.push_back(int_token);
-    server_count = server_count  + int_token;
-
-    NS_ASSERT_MSG(int_token < 255, "Number of hostsSWB exceeded");
-
-    //std::cout << token << std::endl;
-    str.erase(0, pos_slice + delimiter_slice.length());
-
-    numberSlices++;
-
-    NS_ASSERT_MSG(numberSlices < 254, "Number of slices exceeded");
-
-    numberServers_PerSlice.push_back(server_count);
-
-  }
 
   //std::cout << str << std::endl;
 
+
   //Extracts info of the last part of the string
-  server_count = 0;
-  if ((pos_switch = str.find(delimiter_switch)) != std::string::npos){
 
-    token_hosts = str.substr(0, pos_switch);
-    int int_token_hosts = stoi(token_hosts);
+  if ((posQuota = str.find (delimiterQuota)) != std::string::npos)
+    {
 
-    numberHostsSWA = numberHostsSWA + int_token_hosts;  
+      tokenQuota = str.substr (0, posQuota);
+      int intTokenQuota = stoi (tokenQuota);
+      sliceQuotas.push_back (intTokenQuota);
+      maxQuota += intTokenQuota;
 
-    numberHostsSWA_PerSlice.push_back(int_token_hosts);
-    server_count = server_count + int_token_hosts;
+      NS_ASSERT_MSG (intTokenQuota >= 1, "Quota exceeded");
+      NS_ASSERT_MSG (maxQuota <= 100, "Quota exceeded");
 
-    NS_ASSERT_MSG(int_token_hosts < 255, "Number of hostsSWA exceeded");
+      str.erase (0, posQuota + delimiterQuota.length ());
 
-    //std::cout << token_hosts << std::endl;
-    str.erase(0, pos_switch + delimiter_switch.length());
+    }
 
-  }
+
+  serverCount = 0;
+  if ((posSwitch = str.find (delimiterSwitch)) != std::string::npos)
+    {
+
+      tokenHosts = str.substr (0, posSwitch);
+      int intTokenHosts = stoi (tokenHosts);
+
+      numberHostsSWA = numberHostsSWA + intTokenHosts;
+
+      numberHostsSwaPerSlice.push_back (intTokenHosts);
+      serverCount = serverCount + intTokenHosts;
+
+      NS_ASSERT_MSG (intTokenHosts < 255, "Number of hostsSWA exceeded");
+
+      //std::cout << tokenHosts << std::endl;
+      str.erase (0, posSwitch + delimiterSwitch.length ());
+
+    }
 
   numberSlices++;
 
 
-  int int_str = stoi(str);
-  numberHostsSWB = numberHostsSWB + int_str;
+  int intStr = stoi (str);
+  numberHostsSWB = numberHostsSWB + intStr;
 
 
-  numberHostsSWB_PerSlice.push_back(int_str);
-  server_count = server_count + int_str;
+  numberHostsSwbPerSlice.push_back (intStr);
+  serverCount = serverCount + intStr;
 
-  NS_ASSERT_MSG(int_str < 255, "Number of hostsSWB exceeded");
+  NS_ASSERT_MSG (intStr < 255, "Number of hostsSWB exceeded");
 
-  numberServers_PerSlice.push_back(server_count);
+  numberServersPerSlice.push_back (serverCount);
 
   //std::cout << str << std::endl;
   //std::cout << numberHostsSWA << "/" << numberHostsSWB << std::endl;
@@ -485,166 +680,246 @@ configure_slices(std::string config){
 
 
   //Creates the NodeContainers and assign them to the respective slice
-  for(size_t i = 0; i < numberSlices; i++){
+  for (size_t i = 0; i < numberSlices; i++)
+    {
 
-    NodeContainer hostsSWA;
-    NodeContainer hostsSWB;
-    NodeContainer servers;
-    
-
-    hostsSWA.Create(numberHostsSWA_PerSlice[i]);
-    hostsSWB.Create(numberHostsSWB_PerSlice[i]);
-    servers.Create(numberServers_PerSlice[i]);
-    
-    std::vector<NodeContainer> machines;
-
-    machines.push_back(hostsSWA);
-    machines.push_back(hostsSWB);
-    machines.push_back(servers);
+      NodeContainer hostsSWA;
+      NodeContainer hostsSWB;
+      NodeContainer servers;
 
 
-    NodeContainer all_hostsPerSlice_container(hostsSWA, hostsSWB);
-    
-    machines.push_back(all_hostsPerSlice_container);
+      hostsSWA.Create (numberHostsSwaPerSlice[i]);
+      hostsSWB.Create (numberHostsSwbPerSlice[i]);
+      servers.Create (numberServersPerSlice[i]);
 
-    slice_nodes.push_back(machines);
-  
-  }
+      std::vector<NodeContainer> machines;
+
+      machines.push_back (hostsSWA);
+      machines.push_back (hostsSWB);
+      machines.push_back (servers);
+
+
+      NodeContainer allHostsPerSliceContainer (hostsSWA, hostsSWB);
+
+      machines.push_back (allHostsPerSliceContainer);
+
+      sliceNodes.push_back (machines);
+
+    }
 
   //COUT --------
-  //for(size_t i = 0; i < slice_nodes.size(); i++)
-    //for(size_t j = 0; j < slice_nodes[i].size(); j++)
-      //std::cout << "slice " << i << ": " << slice_nodes[i][j].GetN() << std::endl;
+  //for(size_t i = 0; i < sliceNodes.size(); i++)
+  //for(size_t j = 0; j < sliceNodes[i].size(); j++)
+  //std::cout << "slice " << i << ": " << sliceNodes[i][j].GetN() << std::endl;
   //--------
-  
+
 
 
   //Configure the CSMA links between hosts and switches for each devices
-  for(size_t i = 0; i < numberSlices; i++){
+  for (size_t i = 0; i < numberSlices; i++)
+    {
 
 
-    std::vector<Ptr<OFSwitch13Port>> hostsSWAports;
-    std::vector<Ptr<OFSwitch13Port>> hostsSWBports;
-    std::vector<Ptr<OFSwitch13Port>> serverPorts;
+      std::vector<Ptr<OFSwitch13Port> > hostsSWAports;
+      std::vector<Ptr<OFSwitch13Port> > hostsSWBports;
+      std::vector<Ptr<OFSwitch13Port> > serverPorts;
 
-    std::vector<std::vector<Ptr<OFSwitch13Port>>> ports;
+      std::vector<std::vector<Ptr<OFSwitch13Port> > > ports;
 
-    ports.push_back(hostsSWAports);
-    ports.push_back(hostsSWBports);
-    ports.push_back(serverPorts);
+      ports.push_back (hostsSWAports);
+      ports.push_back (hostsSWBports);
+      ports.push_back (serverPorts);
 
-    switch_ports.push_back(ports);
+      switchPorts.push_back (ports);
 
+      NetDeviceContainer hostDevicesSWA;
+      NetDeviceContainer hostDevicesSWB;
+      NetDeviceContainer serversDevices;
 
+      //Configuring CSMA links of the hostsSWA
+      for (size_t j = 0; j < sliceNodes[i][HOSTS_SWA].GetN (); j++)
+        {
+          pairDevs = csmaHelperEndPoints.Install (sliceNodes[i][HOSTS_SWA].Get (j), switches.Get (0));
+          hostDevicesSWA.Add (pairDevs.Get (0));
+          switchPorts[i][HOSTS_SWA].push_back (switchDevices.Get (0)->AddSwitchPort (pairDevs.Get (1)));
+        }
 
-    NetDeviceContainer hostDevicesSWA;
-    NetDeviceContainer hostDevicesSWB;
-    NetDeviceContainer serversDevices;
+      //Configuring CSMA links of the hostsSWB
+      for (size_t j = 0; j < sliceNodes[i][HOSTS_SWB].GetN (); j++)
+        {
+          pairDevs = csmaHelperEndPoints.Install (sliceNodes[i][HOSTS_SWB].Get (j), switches.Get (1));
+          hostDevicesSWB.Add (pairDevs.Get (0));
+          switchPorts[i][HOSTS_SWB].push_back (switchDevices.Get (1)->AddSwitchPort (pairDevs.Get (1)));
+        }
 
-    //Configuring CSMA links of the hostsSWA
-    for(size_t j = 0; j < slice_nodes[i][0].GetN(); j++){
-      pairDevs = csmaHelperEndPoints.Install(slice_nodes[i][0].Get(j), switches.Get(0));
-      hostDevicesSWA.Add (pairDevs.Get(0));
-      switch_ports[i][0].push_back(switchDevices.Get(0)->AddSwitchPort(pairDevs.Get(1)));
+      //Configuring CSMA links of the servers
+      for (size_t j = 0; j < sliceNodes[i][SERVERS].GetN (); j++)
+        {
+          pairDevs = csmaHelperEndPoints.Install (sliceNodes[i][SERVERS].Get (j), switches.Get (2));
+          serversDevices.Add (pairDevs.Get (0));
+          switchPorts[i][SERVERS].push_back (switchDevices.Get (2)->AddSwitchPort (pairDevs.Get (1)));
+        }
+
+      std::vector<NetDeviceContainer> devices;
+
+      devices.push_back (hostDevicesSWA);
+      devices.push_back (hostDevicesSWB);
+      devices.push_back (serversDevices);
+
+      sliceNetDevices.push_back (devices);
+
     }
 
-    //Configuring CSMA links of the hostsSWB
-    for(size_t j = 0; j < slice_nodes[i][1].GetN(); j++){
-      pairDevs = csmaHelperEndPoints.Install(slice_nodes[i][1].Get(j), switches.Get(1));
-      hostDevicesSWB.Add (pairDevs.Get(0));
-      switch_ports[i][1].push_back(switchDevices.Get(1)->AddSwitchPort(pairDevs.Get(1)));
-    }
-
-    //Configuring CSMA links of the servers
-    for(size_t j = 0; j < slice_nodes[i][2].GetN(); j++){
-      pairDevs = csmaHelperEndPoints.Install(slice_nodes[i][2].Get(j), switches.Get(2));
-      serversDevices.Add (pairDevs.Get(0));
-      switch_ports[i][2].push_back(switchDevices.Get(2)->AddSwitchPort(pairDevs.Get(1)));
-    }
-    
-    std::vector<NetDeviceContainer> devices;
-
-    devices.push_back(hostDevicesSWA);
-    devices.push_back(hostDevicesSWB);
-    devices.push_back(serversDevices);
-
-    slice_netDevices.push_back(devices);
-    
-  }
-  
 
   //printPorts();
 
-  //Inicialize controller
-  controllerApp = CreateObject<Controller>();
-  of13Helper->InstallController (controllerNode, controllerApp);
-  of13Helper->CreateOpenFlowChannels ();
 
 
   //Install the TCP/IP stack into hosts nodes (All hosts of all slices)
   InternetStackHelper internet;
 
-  for(size_t i = 0; i < numberSlices; i++){
+  for (size_t i = 0; i < numberSlices; i++)
+    {
 
-    internet.Install (slice_nodes[i][0]); //HostsSWA
-    internet.Install (slice_nodes[i][1]); //HostsSWB
-    internet.Install (slice_nodes[i][2]); //Servers
+      internet.Install (sliceNodes[i][HOSTS_SWA]); //HostsSWA
+      internet.Install (sliceNodes[i][HOSTS_SWB]); //HostsSWB
+      internet.Install (sliceNodes[i][SERVERS]); //Servers
 
-  }
+    }
 
   //Set IPv4 host addresses
   Ipv4AddressHelper ipv4helpr;
 
 
-  std::string base_address_str = "0.x.y.1";
-  Ipv4Address base_address;
+  std::string baseAddressStr = "0.x.y.1";
+  Ipv4Address baseAddress;
 
-  for(size_t i = 0; i < numberSlices; i++){
+  for (size_t i = 0; i < numberSlices; i++)
+    {
 
-    Ipv4InterfaceContainer hostIpIfacesSWA;
-    Ipv4InterfaceContainer hostIpIfacesSWB;
-    Ipv4InterfaceContainer serversIpIfaces;
+      Ipv4InterfaceContainer hostIpIfacesSWA;
+      Ipv4InterfaceContainer hostIpIfacesSWB;
+      Ipv4InterfaceContainer serversIpIfaces;
 
-    std::string base_address_tmp = base_address_str;
+      std::string baseAddressTmp = baseAddressStr;
 
-    //Number to identify if the address is given to a host or a server 
-    int host_server = 1;
+      //Number to identify if the address is given to a host or a server
+      int hostServer = 1;
 
-    std::string slice_id = std::to_string(i);
-    std::string host_server_str = std::to_string(host_server);
+      std::string slice_id = std::to_string (i);
+      std::string hostServer_str = std::to_string (hostServer);
 
-    boost::replace_all(base_address_tmp, "x", slice_id);
-    boost::replace_all(base_address_tmp, "y", host_server_str);
+      boost::replace_all (baseAddressTmp, "x", slice_id);
+      boost::replace_all (baseAddressTmp, "y", hostServer_str);
 
-    base_address.Set(base_address_tmp.c_str());
-    ipv4helpr.SetBase ("10.0.0.0", "255.0.0.0", base_address);
-    hostIpIfacesSWA = ipv4helpr.Assign (slice_netDevices[i][0]); //hostDevicesSWA
-    hostIpIfacesSWB = ipv4helpr.Assign (slice_netDevices[i][1]); //hostDevicesSWB
+      baseAddress.Set (baseAddressTmp.c_str ());
+      ipv4helpr.SetBase ("10.0.0.0", "255.0.0.0", baseAddress);
+      hostIpIfacesSWA = ipv4helpr.Assign (sliceNetDevices[i][HOSTS_SWA]); //hostDevicesSWA
+      hostIpIfacesSWB = ipv4helpr.Assign (sliceNetDevices[i][HOSTS_SWB]); //hostDevicesSWB
 
 
-    base_address_tmp = base_address_str;
-    host_server = host_server + 1;
-    host_server_str = std::to_string(host_server);
-    boost::replace_all(base_address_tmp, "x", slice_id);
-    boost::replace_all(base_address_tmp, "y", host_server_str);
-    
+      baseAddressTmp = baseAddressStr;
+      hostServer = hostServer + 1;
+      hostServer_str = std::to_string (hostServer);
+      boost::replace_all (baseAddressTmp, "x", slice_id);
+      boost::replace_all (baseAddressTmp, "y", hostServer_str);
 
-    base_address.Set(base_address_tmp.c_str());
-    ipv4helpr.SetBase ("10.0.0.0", "255.0.0.0", base_address);
-    serversIpIfaces = ipv4helpr.Assign (slice_netDevices[i][2]); //serversDevices
 
-    std::vector<Ipv4InterfaceContainer> interfaces;
+      baseAddress.Set (baseAddressTmp.c_str ());
+      ipv4helpr.SetBase ("10.0.0.0", "255.0.0.0", baseAddress);
+      serversIpIfaces = ipv4helpr.Assign (sliceNetDevices[i][SERVERS]); //serversDevices
 
-    interfaces.push_back(hostIpIfacesSWA);
-    interfaces.push_back(hostIpIfacesSWB);
-    interfaces.push_back(serversIpIfaces);
+      Ipv4InterfaceContainer allHostsIpIfaces;
+      allHostsIpIfaces.Add(hostIpIfacesSWA);
+      allHostsIpIfaces.Add(hostIpIfacesSWB);
 
-    slice_interfaces.push_back(interfaces);
+      std::vector<Ipv4InterfaceContainer> interfaces;
 
-  }
+      interfaces.push_back (hostIpIfacesSWA);
+      interfaces.push_back (hostIpIfacesSWB);
+      interfaces.push_back (serversIpIfaces);
+      interfaces.push_back (allHostsIpIfaces);
+
+      sliceInterfaces.push_back (interfaces);
+
+    }
 
 }
 
+void
+EnableVerbose (bool enable)
+{ 
+  if (enable)
+    {
+      
+      LogLevel logLevelAll = static_cast<ns3::LogLevel> (LOG_PREFIX_FUNC | LOG_PREFIX_TIME | LOG_LEVEL_ALL);
+      NS_UNUSED (logLevelAll);
+
+      LogComponentEnable ("QosQueue", logLevelAll);
+
+      
+      // // Common components.
+      // LogComponentEnable ("Main",                     logLevelAll);
+      // LogComponentEnable ("SvelteCommon",             logLevelAll);
+
+      // // Helper components.
+      // LogComponentEnable ("SvelteHelper",             logLevelAll);
+      // LogComponentEnable ("TrafficHelper",            logLevelAll);
+
+      // // Infrastructure components.
+      // LogComponentEnable ("BackhaulController",       logLevelAll);
+      // LogComponentEnable ("BackhaulNetwork",          logLevelAll);
+      // LogComponentEnable ("RadioNetwork",             logLevelAll);
+      // LogComponentEnable ("RingController",           logLevelAll);
+      // LogComponentEnable ("RingNetwork",              logLevelAll);
+      // LogComponentEnable ("SvelteEnbApplication",     logLevelAll);
+      // LogComponentEnable ("SvelteQosQueue",           logLevelAll);
+
+      // // Logical components.
+      // LogComponentEnable ("GtpTunnelApp",             logLevelAll);
+      // LogComponentEnable ("PgwTunnelApp",             logLevelAll);
+      // LogComponentEnable ("SliceController",          logLevelAll);
+      // LogComponentEnable ("SliceNetwork",             logLevelAll);
+      // LogComponentEnable ("SvelteMme",                logLevelAll);
+      // LogComponentEnable ("TrafficManager",           logLevelAll);
+
+      // Metadata components.
+      // LogComponentEnable ("EnbInfo",                  logLevelAll);
+       LogComponentEnable ("LinkInfo",                   logLevelAll);
+      // LogComponentEnable ("PgwInfo",                  logLevelAll);
+      // LogComponentEnable ("RingInfo",                 logLevelAll);
+      // LogComponentEnable ("RoutingInfo",              logLevelAll);
+      // LogComponentEnable ("SgwInfo",                  logLevelAll);
+      // LogComponentEnable ("UeInfo",                   logLevelAll);
+
+      // Applications.
+      // LogComponentEnable ("BufferedVideoClient",      logLevelAll);
+      // LogComponentEnable ("BufferedVideoServer",      logLevelAll);
+      // LogComponentEnable ("HttpClient",               logLevelAll);
+      // LogComponentEnable ("HttpServer",               logLevelAll);
+      // LogComponentEnable ("LiveVideoClient",          logLevelAll);
+      // LogComponentEnable ("LiveVideoServer",          logLevelAll);
+      LogComponentEnable ("MyUdpClient",             logLevelAll);
+      LogComponentEnable ("MyUdpServer",             logLevelAll);
+
+      // Statistic components.
+      // LogComponentEnable ("AdmissionStatsCalculator", logLevelAll);
+      // LogComponentEnable ("BackhaulStatsCalculator",  logLevelAll);
+      // LogComponentEnable ("FlowStatsCalculator",      logLevelAll);
+      // LogComponentEnable ("LteRrcStatsCalculator",    logLevelAll);
+      // LogComponentEnable ("PgwTftStatsCalculator",    logLevelAll);
+      // LogComponentEnable ("TrafficStatsCalculator",   logLevelAll);
+
+      // OFSwitch13 module components.
+      LogComponentEnable ("OFSwitch13Controller",     logLevelAll);
+      LogComponentEnable ("OFSwitch13Device",         logLevelAll);
+      LogComponentEnable ("OFSwitch13Helper",         logLevelAll);
+      LogComponentEnable ("OFSwitch13Interface",      logLevelAll);
+      LogComponentEnable ("OFSwitch13Port",           logLevelAll);
+      LogComponentEnable ("OFSwitch13Queue",          logLevelAll);
+      LogComponentEnable ("OFSwitch13SocketHandler",  logLevelAll);
+    }
+}
 
 void
 EnableOfsLogs (bool enable)

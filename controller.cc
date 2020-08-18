@@ -43,6 +43,52 @@ Controller::GetTypeId (void)
   static TypeId tid = TypeId ("ns3::Controller")
     .SetParent<OFSwitch13Controller> ()
     .AddConstructor<Controller> ()
+
+    .AddAttribute ("ExtraStep",
+                   "Extra bit rate adjustment step.",
+                   DataRateValue (DataRate ("12Mbps")),
+                   MakeDataRateAccessor (&Controller::m_extraStep),
+                   MakeDataRateChecker ())
+
+    .AddAttribute ("GuardStep",
+                   "Link guard bit rate.",
+                   DataRateValue (DataRate ("10Mbps")),
+                   MakeDataRateAccessor (&Controller::m_guardStep),
+                   MakeDataRateChecker ())
+    .AddAttribute ("MeterStep",
+                   "Meter bit rate adjustment step.",
+                   DataRateValue (DataRate ("2Mbps")),
+                   MakeDataRateAccessor (&Controller::m_meterStep),
+                   MakeDataRateChecker ())
+
+    .AddAttribute ("SliceMode",
+                   "Inter-slice operation mode.",
+                   TypeId::ATTR_GET | TypeId::ATTR_CONSTRUCT,
+                   EnumValue (SliceMode::DYNA),
+                   MakeEnumAccessor (&Controller::m_sliceMode),
+                   MakeEnumChecker (SliceMode::NONE,
+                                    SliceModeStr (SliceMode::NONE),
+                                    SliceMode::SHAR,
+                                    SliceModeStr (SliceMode::SHAR),
+                                    SliceMode::STAT,
+                                    SliceModeStr (SliceMode::STAT),
+                                    SliceMode::DYNA,
+                                    SliceModeStr (SliceMode::DYNA)))
+    .AddAttribute ("SliceTimeout",
+                   "Inter-slice adjustment timeout.",
+                   TimeValue (Seconds (20)),
+                   MakeTimeAccessor (&Controller::m_sliceTimeout),
+                   MakeTimeChecker ())
+
+    .AddAttribute ("SpareUse",
+                   "Use spare link bit rate for sharing purposes.",
+                   TypeId::ATTR_GET | TypeId::ATTR_CONSTRUCT,
+                   EnumValue (OpMode::ON),
+                   MakeEnumAccessor (&Controller::m_spareUse),
+                   MakeEnumChecker (OpMode::OFF, OpModeStr (OpMode::OFF),
+                                    OpMode::ON,  OpModeStr (OpMode::ON)))
+
+
   ;
   return tid;
 }
@@ -56,137 +102,20 @@ Controller::DoDispose ()
   OFSwitch13Controller::DoDispose ();
 }
 
-ofl_err
-Controller::HandlePacketIn (
-  struct ofl_msg_packet_in *msg, Ptr<const RemoteSwitch> swtch,
-  uint32_t xid)
+SliceMode
+Controller::GetInterSliceMode (void) const
 {
-  NS_LOG_FUNCTION (this << swtch << xid);
+  NS_LOG_FUNCTION (this);
 
-  /*static int prio = 100;
-  uint32_t outPort = OFPP_FLOOD;
-  enum ofp_packet_in_reason reason = msg->reason;
+  return m_sliceMode;
+}
 
-  // Get the switch datapath ID
-  uint64_t swDpId = swtch->GetDpId ();
+OpMode
+Controller::GetSpareUseMode (void) const
+{
+  NS_LOG_FUNCTION (this);
 
-  char *msgStr =
-    ofl_structs_match_to_string ((struct ofl_match_header*)msg->match, 0);
-  NS_LOG_DEBUG ("Packet in match: " << msgStr);
-  free (msgStr);
-
-  if (reason == OFPR_NO_MATCH)
-    {
-      // Let's get necessary information (input port and mac address)
-      uint32_t inPort;
-      size_t portLen = OXM_LENGTH (OXM_OF_IN_PORT); // (Always 4 bytes)
-      struct ofl_match_tlv *input =
-        oxm_match_lookup (OXM_OF_IN_PORT, (struct ofl_match*)msg->match);
-      memcpy (&inPort, input->value, portLen);
-
-      Mac48Address src48;
-      struct ofl_match_tlv *ethSrc =
-        oxm_match_lookup (OXM_OF_ETH_SRC, (struct ofl_match*)msg->match);
-      src48.CopyFrom (ethSrc->value);
-
-      Mac48Address dst48;
-      struct ofl_match_tlv *ethDst =
-        oxm_match_lookup (OXM_OF_ETH_DST, (struct ofl_match*)msg->match);
-      dst48.CopyFrom (ethDst->value);
-
-      // Get L2Table for this datapath
-      auto it = m_learnedInfo.find (swDpId);
-      if (it != m_learnedInfo.end ())
-        {
-          L2Table_t *l2Table = &it->second;
-
-          // Looking for out port based on dst address (except for broadcast)
-          if (!dst48.IsBroadcast ())
-            {
-              auto itDst = l2Table->find (dst48);
-              if (itDst != l2Table->end ())
-                {
-                  outPort = itDst->second;
-                }
-              else
-                {
-                  NS_LOG_DEBUG ("No L2 info for mac " << dst48 << ". Flood.");
-                }
-            }
-
-          // Learning port from source address
-          NS_ASSERT_MSG (!src48.IsBroadcast (), "Invalid src broadcast addr");
-          auto itSrc = l2Table->find (src48);
-          if (itSrc == l2Table->end ())
-            {
-              std::pair<Mac48Address, uint32_t> entry (src48, inPort);
-              auto ret = l2Table->insert (entry);
-              if (ret.second == false)
-                {
-                  NS_LOG_ERROR ("Can't insert mac48address / port pair");
-                }
-              else
-                {
-                  NS_LOG_DEBUG ("Learning that mac " << src48 <<
-                                " can be found at port " << inPort);
-
-                  // Send a flow-mod to switch creating this flow. Let's
-                  // configure the flow entry to 10s idle timeout and to
-                  // notify the controller when flow expires. (flags=0x0001)
-                  std::ostringstream cmd;
-                  cmd << "flow-mod cmd=add,table=0,idle=10,flags=0x0001"
-                      << ",prio=" << ++prio << " eth_dst=" << src48
-                      << " apply:output=" << inPort;
-                  DpctlExecute (swDpId, cmd.str ());
-                }
-            }
-          else
-            {
-              NS_ASSERT_MSG (itSrc->second == inPort,
-                             "Inconsistent L2 switching table");
-            }
-        }
-      else
-        {
-          NS_LOG_ERROR ("No L2 table for this datapath id " << swDpId);
-        }
-
-      // Lets send the packet out to switch.
-      struct ofl_msg_packet_out reply;
-      reply.header.type = OFPT_PACKET_OUT;
-      reply.buffer_id = msg->buffer_id;
-      reply.in_port = inPort;
-      reply.data_length = 0;
-      reply.data = 0;
-
-      if (msg->buffer_id == NO_BUFFER)
-        {
-          // No packet buffer. Send data back to switch
-          reply.data_length = msg->data_length;
-          reply.data = msg->data;
-        }
-
-      // Create output action
-      struct ofl_action_output *a =
-        (struct ofl_action_output*)xmalloc (sizeof (struct ofl_action_output));
-      a->header.type = OFPAT_OUTPUT;
-      a->port = outPort;
-      a->max_len = 0;
-
-      reply.actions_num = 1;
-      reply.actions = (struct ofl_action_header**)&a;
-
-      SendToSwitch (swtch, (struct ofl_msg_header*)&reply, xid);
-      free (a);
-    }
-  else
-    {
-      NS_LOG_WARN ("This controller can't handle the packet. Unkwnon reason.");
-    }
-  */
-  // All handlers must free the message when everything is ok
-  ofl_msg_free ((struct ofl_msg_header*)msg, 0);
-  return 0;
+  return m_spareUse;
 }
 
 ofl_err
@@ -234,13 +163,30 @@ Controller::HandshakeSuccessful (
   // After a successfull handshake, let's install the table-miss entry, setting
   // to 128 bytes the maximum amount of data from a packet that should be sent
   // to the controller.
-  DpctlExecute (swDpId, "flow-mod cmd=add,table=0,prio=0 "
-                "apply:output=ctrl:128");
-
+  DpctlExecute (swDpId, "flow-mod cmd=add,table=0,prio=0 apply:output=ctrl:128");
 
   //Flooding all ARP packets
-  DpctlExecute (swDpId, "flow-mod cmd=add,table=0,prio=10 eth_type=0x0806 "
-                "apply:output=flood");
+  DpctlExecute (swDpId, "flow-mod cmd=add,table=0,prio=10 eth_type=0x0806 apply:output=flood");
+
+  //Standard table 1 Rule
+  DpctlExecute (swDpId, "flow-mod cmd=add,table=1,prio=0 goto:2");
+
+  //Standard table 2 Rule
+  DpctlExecute (swDpId, "flow-mod cmd=add,table=2,prio=0 ");
+
+
+  //QoS output queues rules.
+  for (auto const &it : Dscp2QueueMap ())
+    {
+      std::ostringstream cmd;
+      cmd << "flow-mod cmd=add,prio=32"
+          << ",table="        << QOS_TAB
+          << ",flags="        << FLAGS_REMOVED_OVERLAP_RESET
+          << " eth_type="     << IPV4_PROT_NUM
+          << ",ip_dscp="      << static_cast<uint16_t> (it.first)
+          << " write:queue="  << static_cast<uint32_t> (it.second);
+      DpctlExecute (swDpId, cmd.str ());
+    }
 
 
   // Configure te switch to buffer packets and send only the first 128 bytes of
@@ -259,93 +205,346 @@ Controller::HandshakeSuccessful (
 }
 
 
-void 
-Controller::NotifyTopology(TopologyIfaces_t slice_interfaces, 
-  TopologyPorts_t switch_ports){
+void
+Controller::NotifyClientsServers (TopologyIfaces_t sliceInterfaces,
+                                  TopologyPorts_t switchPorts)
+{
+
+  m_numberSlices = sliceInterfaces.size ();
 
   //Go through slices
-  for(size_t sl = 0; sl < slice_interfaces.size(); sl++){
+  for (size_t sl = 0; sl < m_numberSlices; sl++)
+    {
 
-    //Switch between HostsSWA/HostsSWB/Servers
-    for(size_t sw = 0; sw < 3; sw++){
+      //Switch between HostsSWA/HostsSWB/Servers
+      for (size_t sw = 0; sw < 3; sw++)
+        {
 
-      for(size_t iface = 0; iface < slice_interfaces[sl][sw].GetN(); iface++){
+          for (size_t iface = 0; iface < sliceInterfaces[sl][sw].GetN (); iface++)
+            {
 
-        //Address/Port pair
-        Ipv4Address address = slice_interfaces[sl][sw].GetAddress(iface);
-        Ptr<OFSwitch13Port> port = switch_ports[sl][sw][iface];
+              //Address/Port pair
+              Ipv4Address address = sliceInterfaces[sl][sw].GetAddress (iface);
+              Ptr<OFSwitch13Port> port = switchPorts[sl][sw][iface];
 
-        //Install the rule on switches
-        std::ostringstream cmd;
-        cmd << "flow-mod cmd=add,table=0,prio=1000"
-        << " eth_type=0x0800,ip_dst=" << address
-        << " apply:output=" << port->GetPortNo();
-        DpctlExecute (port->GetSwitchDevice()->GetDpId(), cmd.str ());
+              //Install the rule on switches
+              std::ostringstream cmd;
+              cmd << "flow-mod cmd=add,table=0,prio=1000"
+                  << " eth_type=0x0800,ip_dst=" << address
+                  << " write:output=" << port->GetPortNo ()
+                  << " goto:2"; //Skip meter table
+              DpctlExecute (port->GetSwitchDevice ()->GetDpId (), cmd.str ());
 
-        std::cout << cmd.str() << std::endl;
 
-      }
+            }
+        }
+
     }
-
-
-
-    
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-    /*std::cout << "HOSTS SWA SLICE " << i << ": " << std::endl;
-    for(size_t j = 0; j < slice_interfaces[i][0].GetN(); j++)
-      std::cout << slice_interfaces[i][0].GetAddress(j) << std::endl;
-
-
-    std::cout << "HOSTS SWB SLICE " << i << ": " << std::endl;
-    for(size_t j = 0; j < slice_interfaces[i][1].GetN(); j++)
-      std::cout << slice_interfaces[i][1].GetAddress(j) << std::endl;
-
-
-    std::cout << "HOSTS SERVERS SLICE " << i << ": " << std::endl;
-    for(size_t j = 0; j < slice_interfaces[i][2].GetN(); j++)
-      std::cout << slice_interfaces[i][2].GetAddress(j) << std::endl;
-
-
-    for(size_t j = 0; j < switch_ports[i][0].size(); j++){
-
-      std::cout << "SLICE " << i << " PORTAS SWA : ";
-      std::cout << switch_ports[i][0][j]->GetPortNo() << std::endl;
-    }
-    std::cout << "----------------" << std::endl;
-
-    for(size_t j = 0; j < switch_ports[i][1].size(); j++){
-      std::cout << "SLICE " << i << " PORTAS SWB : ";
-      std::cout << switch_ports[i][1][j]->GetPortNo() << std::endl;
-    }
-    std::cout << "----------------" << std::endl;
-
-    for(size_t j = 0; j < switch_ports[i][2].size(); j++){
-      std::cout << "SLICE " << i << " PORTAS SERVERS : ";
-      std::cout << switch_ports[i][2][j]->GetPortNo() << std::endl;
-    }
-
-    std::cout << "----------------" << std::endl;*/
-
-  }
 
 }
 
 
+void
+Controller::NotifySwitches (PortsVector_t interSwitchesPorts,
+                            OFSwitch13DeviceContainer switchDevices)
+{
+
+
+  //Installing the fowarding rules between switches.
+
+  //SWA
+  std::ostringstream cmd;
+  cmd << "flow-mod cmd=add,table=0,prio=500"
+      << " eth_type=0x0800,ip_dst=10.0.2.0/255.0.255.0"
+      << " write:output=" << interSwitchesPorts[0]->GetPortNo ()
+      << " goto:1";
+  DpctlExecute (switchDevices.Get (0)->GetDpId (), cmd.str ());
+
+  //SWB
+  std::ostringstream cmd2;
+  cmd2 << "flow-mod cmd=add,table=0,prio=500"
+       << " eth_type=0x0800,ip_dst=10.0.1.0/255.0.255.0"
+       << " write:output=" << interSwitchesPorts[1]->GetPortNo ()
+       << " goto:1";
+  DpctlExecute (switchDevices.Get (1)->GetDpId (), cmd2.str ());
+
+  //SWB
+  std::ostringstream cmd3;
+  cmd3 << "flow-mod cmd=add,table=0,prio=500"
+       << " eth_type=0x0800,ip_dst=10.0.2.0/255.0.255.0"
+       << " write:output=" << interSwitchesPorts[2]->GetPortNo ()
+       << " goto:1";
+  DpctlExecute (switchDevices.Get (1)->GetDpId (), cmd3.str ());
+
+
+  //Server's Switch
+  std::ostringstream cmd4;
+  cmd4 << "flow-mod cmd=add,table=0,prio=500"
+       << " eth_type=0x0800,ip_dst=10.0.1.0/255.0.255.0"
+       << " write:output=" << interSwitchesPorts[3]->GetPortNo ()
+       << " goto:1";
+  DpctlExecute (switchDevices.Get (2)->GetDpId (), cmd4.str ());
+
+
+
+  //Get the pointers to link informations
+  m_lInfoA = LinkInfo::GetPointer (1, 2);
+  m_lInfoB = LinkInfo::GetPointer (2, 3);
+
+
+}
+
+
+void
+Controller::ConfigureMeters (std::vector<int> sliceQuotas)
+{
+
+
+  for (size_t sliceId = 0; sliceId < m_numberSlices; sliceId++)
+    {
+      // Install slicing meters in both link directions.
+      for (int d = 0; d < N_LINK_DIRS; d++)
+        {
+          LinkInfo::LinkDir dir = static_cast<LinkInfo::LinkDir> (d);
+
+          bool success = true;
+          success &= m_lInfoA->UpdateQuota (dir, sliceId, sliceQuotas[sliceId]);
+          success &= m_lInfoB->UpdateQuota (dir, sliceId, sliceQuotas[sliceId]);
+          NS_ASSERT_MSG (success, "Error when setting slice quotas.");
+
+        }
+    }
+
+  // ---------------------------------------------------------------------
+  // Meter table
+  //
+  // Install inter-slicing meters, depending on the InterSliceMode attribute.
+  switch (GetInterSliceMode ())
+    {
+    case SliceMode::NONE:
+      // Nothing to do when inter-slicing is disabled.
+      return;
+
+    case SliceMode::SHAR:
+      for (auto &lInfo : LinkInfo::GetList ())
+        {
+          // Install high-priority individual Non-GBR meter entries for slices
+          // with disabled bandwidth sharing and the low-priority shared
+          // Non-GBR meter entry for other slices.
+          SlicingMeterInstall (lInfo, SLICE_ALL);
+
+        }
+      break;
+
+    case SliceMode::STAT:
+    case SliceMode::DYNA:
+      for (auto &lInfo : LinkInfo::GetList ())
+        {
+          // Install individual Non-GBR meter entries.
+          for (size_t slc = 0; slc < m_numberSlices; slc++)
+            {
+              SlicingMeterInstall (lInfo, slc);
+            }
+        }
+      break;
+
+    default:
+      NS_LOG_WARN ("Undefined inter-slicing operation mode.");
+      break;
+    }
+
+  //
+  for (size_t sliceId = 0; sliceId < m_numberSlices; sliceId++)
+    {
+      // Install slicing meters in both link directions.
+      SlicingMeterApply (m_lInfoA, sliceId);
+      SlicingMeterApply (m_lInfoB, sliceId);
+    }
+
+
+}
+
+void
+Controller::SlicingMeterApply (Ptr<LinkInfo> lInfo, int sliceId)
+{
+  NS_LOG_FUNCTION (this << lInfo << sliceId);
+
+  // -------------------------------------------------------------------------
+  // Bandwidth table -- [from higher to lower priority]
+  //
+  // Build the command string.
+  // Using a low-priority rule for ALL slice.
+  std::ostringstream cmd;
+  cmd << "flow-mod cmd=add"
+      << ",prio="       << (sliceId == SLICE_ALL ? 32 : 64)
+      << ",table="      << METER_TAB
+      << ",flags="      << FLAGS_REMOVED_OVERLAP_RESET;
+
+
+  uint32_t meterId = MeterIdSlcCreate (sliceId, static_cast<int> (LinkInfo::FWD));
+
+  // Build the match string.
+  std::ostringstream mtc;
+  mtc << " eth_type="   << IPV4_PROT_NUM
+      << ",ip_dst=10." << sliceId << ".2.0/255.255.255.0"
+      << " meter:" << meterId
+      << " goto:" << QOS_TAB;
+
+  DpctlExecute (lInfo->GetSwDpId (static_cast<int> (LinkInfo::FWD)), cmd.str () + mtc.str ());
+
+
+  meterId = MeterIdSlcCreate (sliceId, static_cast<int> (LinkInfo::BWD));
+
+  // Build the match string.
+  std::ostringstream mtc1;
+  mtc1 << " eth_type="   << IPV4_PROT_NUM
+       << ",ip_dst=10." << sliceId << ".1.0/255.255.255.0"
+       << " meter:" << meterId
+       << " goto:" << QOS_TAB;
+  DpctlExecute (lInfo->GetSwDpId (static_cast<int> (LinkInfo::BWD)), cmd.str () + mtc1.str ());
+
+}
+
+void
+Controller::SlicingMeterAdjust (
+  Ptr<LinkInfo> lInfo, int sliceId)
+{
+  NS_LOG_FUNCTION (this << lInfo << sliceId);
+
+  // Update inter-slicing meter, depending on the InterSliceMode attribute.
+  NS_ASSERT_MSG (sliceId < SLICE_ALL, "Invalid slice for this operation.");
+  switch (GetInterSliceMode ())
+    {
+    case SliceMode::NONE:
+      // Nothing to do when inter-slicing is disabled.
+      return;
+
+    case SliceMode::SHAR:
+      // Identify the Non-GBR meter entry to adjust: individual or shared.
+      sliceId = SLICE_ALL;
+
+      break;
+
+    case SliceMode::STAT:
+    case SliceMode::DYNA:
+      // Update the individual Non-GBR meter entry.
+      break;
+
+    default:
+      NS_LOG_WARN ("Undefined inter-slicing operation mode.");
+      break;
+    }
+
+  // Check for updated slicing meters in both link directions.
+  for (int d = 0; d < N_LINK_DIRS; d++)
+    {
+      LinkInfo::LinkDir dir = static_cast<LinkInfo::LinkDir> (d);
+
+      int64_t meterBitRate = 0;
+      if (sliceId == SLICE_ALL)
+        {
+          // Iterate over slices with enabled bandwidth sharing
+          // to sum the quota bit rate.
+          for (size_t slc = 0; slc < m_numberSlices; slc++)
+            {
+              meterBitRate += lInfo->GetUnrBitRate (dir, slc);
+            }
+          // When enable, sum the spare bit rate too.
+          if (GetSpareUseMode () == OpMode::ON)
+            {
+              meterBitRate += lInfo->GetUnrBitRate (dir, SLICE_UNKN);
+            }
+        }
+      else
+        {
+          meterBitRate = lInfo->GetUnrBitRate (dir, sliceId);
+        }
+
+      int64_t currBitRate = lInfo->GetMetBitRate (dir, sliceId);
+      uint64_t diffBitRate = std::abs (currBitRate - meterBitRate);
+      NS_LOG_DEBUG ("Current slice " << sliceId <<
+                    " direction "    << LinkInfo::LinkDirStr (dir) <<
+                    " diff rate "    << diffBitRate);
+
+      if (diffBitRate >= m_meterStep.GetBitRate ())
+        {
+          uint32_t meterId = MeterIdSlcCreate (sliceId, d);
+          int64_t meterKbps = Bps2Kbps (meterBitRate);
+          bool success = lInfo->SetMetBitRate (dir, sliceId, meterKbps * 1000);
+          NS_ASSERT_MSG (success, "Error when setting meter bit rate.");
+
+          NS_LOG_INFO ("Update slice " << sliceId <<
+                       " direction "   << LinkInfo::LinkDirStr (dir) <<
+                       " meter ID "    << GetUint32Hex (meterId) <<
+                       " bitrate "     << meterKbps << " Kbps");
+
+          std::ostringstream cmd;
+          cmd << "meter-mod cmd=mod"
+              << ",flags="      << OFPMF_KBPS
+              << ",meter="      << meterId
+              << " drop:rate="  << meterKbps;
+          DpctlExecute (lInfo->GetSwDpId (d), cmd.str ());
+        }
+    }
+}
+
+
+void
+Controller::SlicingMeterInstall (Ptr<LinkInfo> lInfo, int sliceId)
+{
+  NS_LOG_FUNCTION (this << lInfo << sliceId);
+
+  NS_ASSERT_MSG (GetInterSliceMode () != SliceMode::NONE,
+                 "Invalid inter-slice operation mode.");
+
+  // Install slicing meters in both link directions.
+  for (int d = 0; d < N_LINK_DIRS; d++)
+    {
+      LinkInfo::LinkDir dir = static_cast<LinkInfo::LinkDir> (d);
+
+      int64_t meterBitRate = 0;
+      if (sliceId == SLICE_ALL)
+        {
+          NS_ASSERT_MSG (GetInterSliceMode () == SliceMode::SHAR,
+                         "Invalid inter-slice operation mode.");
+
+          // Iterate over slices with enabled bandwidth sharing
+          // to sum the quota bit rate.
+          for (size_t slc = 0; slc < m_numberSlices; slc++)
+            {
+              meterBitRate += lInfo->GetQuoBitRate (dir, slc);
+            }
+          // When enable, sum the spare bit rate too.
+          if (GetSpareUseMode () == OpMode::ON)
+            {
+              meterBitRate += lInfo->GetQuoBitRate (dir, SLICE_UNKN);
+            }
+        }
+      else
+        {
+          meterBitRate = lInfo->GetQuoBitRate (dir, sliceId);
+        }
+
+      uint32_t meterId = MeterIdSlcCreate (sliceId, d);
+      int64_t meterKbps = Bps2Kbps (meterBitRate);
+      bool success = lInfo->SetMetBitRate (dir, sliceId, meterKbps * 1000);
+      NS_ASSERT_MSG (success, "Error when setting meter bit rate.");
+
+      NS_LOG_INFO ("Create slice " << sliceId <<
+                   " direction "   << LinkInfo::LinkDirStr (dir) <<
+                   " meter ID "    << GetUint32Hex (meterId) <<
+                   " bitrate "     << meterKbps << " Kbps");
+
+      std::ostringstream cmd;
+      cmd << "meter-mod cmd=add"
+          << ",flags="      << OFPMF_KBPS
+          << ",meter="      << meterId
+          << " drop:rate="  << meterKbps;
+      DpctlExecute (lInfo->GetSwDpId (d), cmd.str ());
+    }
+}
+
+
 } // namespace ns3
+
 #endif // NS3_OFSWITCH13
