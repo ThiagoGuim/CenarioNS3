@@ -367,7 +367,7 @@ MyUdpClient::StartApplication (void)
     MakeCallback (&MyUdpClient::ReadPacket, this));
 
 
-  m_serverApp->StartApplication();
+  // m_serverApp->StartApplication();
   Start();
 
 }

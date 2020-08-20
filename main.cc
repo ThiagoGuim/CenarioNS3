@@ -213,7 +213,11 @@ main (int argc, char *argv[])
       }
   }
 
-  apps.Start(Seconds (2.0));
+  for (size_t i = 0; i < apps.GetN(); i++)
+  {
+    Ptr<Application> app = apps.Get(i);
+    app->SetStartTime(Seconds(i+1.0));
+  }
 
   //
   // Create a UdpEchoServer application.
@@ -855,7 +859,7 @@ EnableVerbose (bool enable)
       LogLevel logLevelAll = static_cast<ns3::LogLevel> (LOG_PREFIX_FUNC | LOG_PREFIX_TIME | LOG_LEVEL_ALL);
       NS_UNUSED (logLevelAll);
 
-      LogComponentEnable ("QosQueue", logLevelAll);
+      // LogComponentEnable ("QosQueue", logLevelAll);
 
       
       // // Common components.
@@ -885,7 +889,7 @@ EnableVerbose (bool enable)
 
       // Metadata components.
       // LogComponentEnable ("EnbInfo",                  logLevelAll);
-       LogComponentEnable ("LinkInfo",                   logLevelAll);
+      // LogComponentEnable ("LinkInfo",                   logLevelAll);
       // LogComponentEnable ("PgwInfo",                  logLevelAll);
       // LogComponentEnable ("RingInfo",                 logLevelAll);
       // LogComponentEnable ("RoutingInfo",              logLevelAll);
@@ -911,13 +915,13 @@ EnableVerbose (bool enable)
       // LogComponentEnable ("TrafficStatsCalculator",   logLevelAll);
 
       // OFSwitch13 module components.
-      LogComponentEnable ("OFSwitch13Controller",     logLevelAll);
-      LogComponentEnable ("OFSwitch13Device",         logLevelAll);
-      LogComponentEnable ("OFSwitch13Helper",         logLevelAll);
-      LogComponentEnable ("OFSwitch13Interface",      logLevelAll);
-      LogComponentEnable ("OFSwitch13Port",           logLevelAll);
-      LogComponentEnable ("OFSwitch13Queue",          logLevelAll);
-      LogComponentEnable ("OFSwitch13SocketHandler",  logLevelAll);
+      // LogComponentEnable ("OFSwitch13Controller",     logLevelAll);
+      // LogComponentEnable ("OFSwitch13Device",         logLevelAll);
+      // LogComponentEnable ("OFSwitch13Helper",         logLevelAll);
+      // LogComponentEnable ("OFSwitch13Interface",      logLevelAll);
+      // LogComponentEnable ("OFSwitch13Port",           logLevelAll);
+      // LogComponentEnable ("OFSwitch13Queue",          logLevelAll);
+      // LogComponentEnable ("OFSwitch13SocketHandler",  logLevelAll);
     }
 }
 
