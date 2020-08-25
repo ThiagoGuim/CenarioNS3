@@ -15,21 +15,8 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *
- * Author: Luciano Chaves <luciano@lrc.ic.unicamp.br>
- *         Vitor M. Eichemberger <vitor.marge@gmail.com>
- *
- * Two hosts connected to different OpenFlow switches.
- * Both switches are managed by the default learning controller application.
- *
- *                       Learning Controller
- *                                |
- *                         +-------------+
- *                         |             |
- *                  +----------+     +----------+
- *       Host 0 === | Switch 0 | === | Switch 1 | === Host 1
- *                  +----------+     +----------+
+ * Author:
  */
-
 
 #include <ns3/netanim-module.h>
 #include <ns3/core-module.h>
@@ -44,7 +31,7 @@
 #include <boost/algorithm/string/replace.hpp>
 #include <string>
 #include "controller.h"
-#include "my-application-helper.h"
+#include "udp-peer-helper.h"
 
 
 using namespace ns3;
@@ -198,26 +185,26 @@ main (int argc, char *argv[])
 
     }
 
-
-  MyApplicationHelper appHelper;
+  UdpPeerHelper appHelper;
   ApplicationContainer apps;
-  
-  for (size_t i = 0; i < numberSlices; i++){
-    for (size_t j = 0; j < sliceNodes[i][ALL_HOSTS].GetN (); j++)
-      { 
 
-        apps.Add(appHelper.Install(sliceNodes[i][ALL_HOSTS].Get (j), sliceNodes[i][SERVERS].Get (j), 
-        sliceInterfaces[i][ALL_HOSTS].GetAddress (j), sliceInterfaces[i][SERVERS].GetAddress (j), 
-        9, 9, Ipv4Header::DSCP_AF32));
+  for (size_t i = 0; i < numberSlices; i++)
+    {
+      for (size_t j = 0; j < sliceNodes[i][ALL_HOSTS].GetN (); j++)
+        {
 
-      }
-  }
+          apps.Add (appHelper.Install (sliceNodes[i][ALL_HOSTS].Get (j), sliceNodes[i][SERVERS].Get (j),
+                                       sliceInterfaces[i][ALL_HOSTS].GetAddress (j), sliceInterfaces[i][SERVERS].GetAddress (j),
+                                       9, 9, Ipv4Header::DSCP_AF32));
 
-  for (size_t i = 0; i < apps.GetN(); i++)
-  {
-    Ptr<Application> app = apps.Get(i);
-    app->SetStartTime(Seconds(i+1.0));
-  }
+        }
+    }
+
+  // for (size_t i = 0; i < apps.GetN(); i++)
+  // {
+  //   Ptr<Application> app = apps.Get(i);
+  //   app->SetStartTime(Seconds(i+1.0));
+  // }
 
   //
   // Create a UdpEchoServer application.
@@ -834,8 +821,8 @@ configureSlices (std::string config)
       serversIpIfaces = ipv4helpr.Assign (sliceNetDevices[i][SERVERS]); //serversDevices
 
       Ipv4InterfaceContainer allHostsIpIfaces;
-      allHostsIpIfaces.Add(hostIpIfacesSWA);
-      allHostsIpIfaces.Add(hostIpIfacesSWB);
+      allHostsIpIfaces.Add (hostIpIfacesSWA);
+      allHostsIpIfaces.Add (hostIpIfacesSWB);
 
       std::vector<Ipv4InterfaceContainer> interfaces;
 
@@ -852,16 +839,16 @@ configureSlices (std::string config)
 
 void
 EnableVerbose (bool enable)
-{ 
+{
   if (enable)
     {
-      
+
       LogLevel logLevelAll = static_cast<ns3::LogLevel> (LOG_PREFIX_FUNC | LOG_PREFIX_TIME | LOG_LEVEL_ALL);
       NS_UNUSED (logLevelAll);
 
       // LogComponentEnable ("QosQueue", logLevelAll);
 
-      
+
       // // Common components.
       // LogComponentEnable ("Main",                     logLevelAll);
       // LogComponentEnable ("SvelteCommon",             logLevelAll);
@@ -903,8 +890,7 @@ EnableVerbose (bool enable)
       // LogComponentEnable ("HttpServer",               logLevelAll);
       // LogComponentEnable ("LiveVideoClient",          logLevelAll);
       // LogComponentEnable ("LiveVideoServer",          logLevelAll);
-      LogComponentEnable ("MyUdpClient",             logLevelAll);
-      LogComponentEnable ("MyUdpServer",             logLevelAll);
+      LogComponentEnable ("UdpPeerApp",             logLevelAll);
 
       // Statistic components.
       // LogComponentEnable ("AdmissionStatsCalculator", logLevelAll);
