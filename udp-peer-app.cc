@@ -57,31 +57,39 @@ UdpPeerApp::GetTypeId (void)
                    MakeAddressChecker ())
     .AddAttribute ("PktInterval",
                    "A random variable for the interval between packets [s].",
-                   StringValue ("ns3::ConstantRandomVariable[Constant=1]"),
+                   StringValue ("ns3::ConstantRandomVariable[Constant=0.08]"),
                    MakePointerAccessor (&UdpPeerApp::m_pktInterRng),
                    MakePointerChecker <RandomVariableStream> ())
     .AddAttribute ("PktSize",
                    "A random variable for the packet size [bytes].",
-                   StringValue ("ns3::ConstantRandomVariable[Constant=1024]"),
+                   StringValue ("ns3::ConstantRandomVariable[Constant=1000]"),
                    MakePointerAccessor (&UdpPeerApp::m_pktSizeRng),
+                   MakePointerChecker <RandomVariableStream> ())
+    .AddAttribute ("TrafficLength",
+                   "A random variable for the traffic length [s].",
+                   StringValue ("ns3::ConstantRandomVariable[Constant=60]"),
+                   MakePointerAccessor (&UdpPeerApp::m_lengthRng),
                    MakePointerChecker <RandomVariableStream> ())
   ;
   return tid;
 }
 
 void
-UdpPeerApp::StartTraffic (Time duration)
+UdpPeerApp::StartTraffic (void)
 {
-  NS_LOG_FUNCTION (this << duration);
+  NS_LOG_FUNCTION (this);
 
   NS_ASSERT_MSG (m_localSocket, "Closed UDP socket.");
 
   // Schedule the first packet transmission.
+  m_sendEvent.Cancel ();
   Time sendTime = Seconds (std::abs (m_pktInterRng->GetValue ()));
   m_sendEvent = Simulator::Schedule (sendTime, &UdpPeerApp::SendPacket, this);
 
   // Schedule the application to stop.
-  Simulator::Schedule (duration, &UdpPeerApp::StopApplication, this);
+  m_stopEvent.Cancel ();
+  Time stopTime = Seconds (std::abs (m_lengthRng->GetValue ()));
+  m_stopEvent = Simulator::Schedule (stopTime, &UdpPeerApp::StopApplication, this);
 }
 
 void

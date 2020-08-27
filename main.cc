@@ -36,6 +36,7 @@
 
 using namespace ns3;
 
+NS_LOG_COMPONENT_DEFINE ("Main");
 
 typedef std::vector<std::vector<NodeContainer> > TopologyNodes_t;
 typedef std::vector<std::vector<NetDeviceContainer> > TopologyNetDevices_t;
@@ -185,19 +186,34 @@ main (int argc, char *argv[])
 
     }
 
-  UdpPeerHelper appHelper;
-  ApplicationContainer apps;
-
   for (size_t i = 0; i < numberSlices; i++)
     {
-      for (size_t j = 0; j < sliceNodes[i][ALL_HOSTS].GetN (); j++)
-        {
+      Ptr<ExponentialRandomVariable> startRng = CreateObject<ExponentialRandomVariable> ();
+      startRng->SetAttribute ("Mean", DoubleValue (5));
 
-          apps.Add (appHelper.Install (sliceNodes[i][ALL_HOSTS].Get (j), sliceNodes[i][SERVERS].Get (j),
-                                       sliceInterfaces[i][ALL_HOSTS].GetAddress (j), sliceInterfaces[i][SERVERS].GetAddress (j),
-                                       9, 9, Ipv4Header::DSCP_AF32));
+      // Configuring traffic patterns for this slice
+      Ptr<UdpPeerHelper> appHelper = CreateObject<UdpPeerHelper> ();
+      // appHelper->SetAttribute ("NumApps", UintegerValue (5));
+      // appHelper->SetAttribute ("StartInterval", PointerValue (startRng));
 
-        }
+      // // Define the packet size and interval for UDP traffic.
+      // appHelper->SetPeerAttribute ("PktInterval", StringValue ("ns3::NormalRandomVariable[Mean=0.01|Variance=0.001]"));
+      // appHelper->SetPeerAttribute ("PktSize", StringValue ("ns3::UniformRandomVariable[Min=1024|Max=1460]"));
+
+      // // Disable the traffic at the UDP server node.
+      // appHelper->Set2ndAttribute ("PktInterval", StringValue ("ns3::ConstantRandomVariable[Constant=1000000]"));
+
+      appHelper->Install (sliceNodes[i][ALL_HOSTS], sliceNodes[i][SERVERS],
+                          sliceInterfaces[i][ALL_HOSTS], sliceInterfaces[i][SERVERS]);
+
+      // for (size_t j = 0; j < sliceNodes[i][ALL_HOSTS].GetN (); j++)
+      //   {
+
+      //     appHelper->Install (sliceNodes[i][ALL_HOSTS].Get (j), sliceNodes[i][SERVERS].Get (j),
+      //                        sliceInterfaces[i][ALL_HOSTS].GetAddress (j), sliceInterfaces[i][SERVERS].GetAddress (j),
+      //                        9, 9, Seconds(5), Seconds (10), Ipv4Header::DscpDefault);
+
+      //   }
     }
 
   // for (size_t i = 0; i < apps.GetN(); i++)
@@ -842,72 +858,38 @@ EnableVerbose (bool enable)
 {
   if (enable)
     {
+      LogLevel logLevelWarn = static_cast<ns3::LogLevel> (
+          LOG_PREFIX_FUNC | LOG_PREFIX_TIME | LOG_LEVEL_WARN);
+      NS_UNUSED (logLevelWarn);
 
-      LogLevel logLevelAll = static_cast<ns3::LogLevel> (LOG_PREFIX_FUNC | LOG_PREFIX_TIME | LOG_LEVEL_ALL);
+      LogLevel logLevelWarnInfo = static_cast<ns3::LogLevel> (
+          LOG_PREFIX_FUNC | LOG_PREFIX_TIME | LOG_LEVEL_WARN | LOG_INFO);
+      NS_UNUSED (logLevelWarnInfo);
+
+      LogLevel logLevelInfo = static_cast<ns3::LogLevel> (
+          LOG_PREFIX_FUNC | LOG_PREFIX_TIME | LOG_LEVEL_INFO);
+      NS_UNUSED (logLevelInfo);
+
+      LogLevel logLevelAll = static_cast<ns3::LogLevel> (
+          LOG_PREFIX_FUNC | LOG_PREFIX_TIME | LOG_LEVEL_ALL);
       NS_UNUSED (logLevelAll);
 
-      // LogComponentEnable ("QosQueue", logLevelAll);
+      // Common components.
+      LogComponentEnable ("Main",                     logLevelAll);
+      LogComponentEnable ("Common",                   logLevelAll);
 
-
-      // // Common components.
-      // LogComponentEnable ("Main",                     logLevelAll);
-      // LogComponentEnable ("SvelteCommon",             logLevelAll);
-
-      // // Helper components.
-      // LogComponentEnable ("SvelteHelper",             logLevelAll);
-      // LogComponentEnable ("TrafficHelper",            logLevelAll);
-
-      // // Infrastructure components.
-      // LogComponentEnable ("BackhaulController",       logLevelAll);
-      // LogComponentEnable ("BackhaulNetwork",          logLevelAll);
-      // LogComponentEnable ("RadioNetwork",             logLevelAll);
-      // LogComponentEnable ("RingController",           logLevelAll);
-      // LogComponentEnable ("RingNetwork",              logLevelAll);
-      // LogComponentEnable ("SvelteEnbApplication",     logLevelAll);
-      // LogComponentEnable ("SvelteQosQueue",           logLevelAll);
-
-      // // Logical components.
-      // LogComponentEnable ("GtpTunnelApp",             logLevelAll);
-      // LogComponentEnable ("PgwTunnelApp",             logLevelAll);
-      // LogComponentEnable ("SliceController",          logLevelAll);
-      // LogComponentEnable ("SliceNetwork",             logLevelAll);
-      // LogComponentEnable ("SvelteMme",                logLevelAll);
-      // LogComponentEnable ("TrafficManager",           logLevelAll);
-
-      // Metadata components.
-      // LogComponentEnable ("EnbInfo",                  logLevelAll);
-      // LogComponentEnable ("LinkInfo",                   logLevelAll);
-      // LogComponentEnable ("PgwInfo",                  logLevelAll);
-      // LogComponentEnable ("RingInfo",                 logLevelAll);
-      // LogComponentEnable ("RoutingInfo",              logLevelAll);
-      // LogComponentEnable ("SgwInfo",                  logLevelAll);
-      // LogComponentEnable ("UeInfo",                   logLevelAll);
-
-      // Applications.
-      // LogComponentEnable ("BufferedVideoClient",      logLevelAll);
-      // LogComponentEnable ("BufferedVideoServer",      logLevelAll);
-      // LogComponentEnable ("HttpClient",               logLevelAll);
-      // LogComponentEnable ("HttpServer",               logLevelAll);
-      // LogComponentEnable ("LiveVideoClient",          logLevelAll);
-      // LogComponentEnable ("LiveVideoServer",          logLevelAll);
-      LogComponentEnable ("UdpPeerApp",             logLevelAll);
-
-      // Statistic components.
-      // LogComponentEnable ("AdmissionStatsCalculator", logLevelAll);
-      // LogComponentEnable ("BackhaulStatsCalculator",  logLevelAll);
-      // LogComponentEnable ("FlowStatsCalculator",      logLevelAll);
-      // LogComponentEnable ("LteRrcStatsCalculator",    logLevelAll);
-      // LogComponentEnable ("PgwTftStatsCalculator",    logLevelAll);
-      // LogComponentEnable ("TrafficStatsCalculator",   logLevelAll);
+      // Traffic and applications.
+      LogComponentEnable ("UdpPeerApp",               logLevelWarn);
+      LogComponentEnable ("UdpPeerHelper",            logLevelWarnInfo);
 
       // OFSwitch13 module components.
-      // LogComponentEnable ("OFSwitch13Controller",     logLevelAll);
-      // LogComponentEnable ("OFSwitch13Device",         logLevelAll);
-      // LogComponentEnable ("OFSwitch13Helper",         logLevelAll);
-      // LogComponentEnable ("OFSwitch13Interface",      logLevelAll);
-      // LogComponentEnable ("OFSwitch13Port",           logLevelAll);
-      // LogComponentEnable ("OFSwitch13Queue",          logLevelAll);
-      // LogComponentEnable ("OFSwitch13SocketHandler",  logLevelAll);
+      LogComponentEnable ("OFSwitch13Controller",     logLevelWarn);
+      LogComponentEnable ("OFSwitch13Device",         logLevelWarn);
+      LogComponentEnable ("OFSwitch13Helper",         logLevelWarn);
+      LogComponentEnable ("OFSwitch13Interface",      logLevelWarn);
+      LogComponentEnable ("OFSwitch13Port",           logLevelWarn);
+      LogComponentEnable ("OFSwitch13Queue",          logLevelWarn);
+      LogComponentEnable ("OFSwitch13SocketHandler",  logLevelWarn);
     }
 }
 

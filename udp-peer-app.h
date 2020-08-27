@@ -45,9 +45,8 @@ public:
 
   /**
    * Start the application traffic.
-   * \param duration The traffic length.
    */
-  void StartTraffic (Time duration);
+  void StartTraffic (void);
 
 protected:
   /** Destructor implementation */
@@ -59,13 +58,13 @@ private:
   virtual void StopApplication (void);
 
   /**
-   * \brief Socket receive callback.
+   * Socket receive callback.
    * \param socket Socket with data available to be read.
    */
   void ReadPacket (Ptr<Socket> socket);
 
   /**
-   * \brief Handle a packet transmission.
+   * Handle a packet transmission.
    */
   void SendPacket (void);
 
@@ -74,6 +73,7 @@ private:
   Address                     m_peerAddress;    //!< Peer address.
   Ptr<RandomVariableStream>   m_pktInterRng;    //!< Packet interval time.
   Ptr<RandomVariableStream>   m_pktSizeRng;     //!< Packet size.
+  Ptr<RandomVariableStream>   m_lengthRng;      //!< Traffic length.
   EventId                     m_sendEvent;      //!< SendPacket event.
 };
 

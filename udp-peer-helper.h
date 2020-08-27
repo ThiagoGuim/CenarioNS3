@@ -31,17 +31,17 @@ namespace ns3 {
 /**
  * This helper will make life easier for setting up UDP peer applications.
  */
-class UdpPeerHelper
+class UdpPeerHelper : public Object
 {
 public:
-  UdpPeerHelper ();     //!< Default constructor.
+  UdpPeerHelper ();           //!< Default constructor.
+  virtual ~UdpPeerHelper ();  //!< Dummy destructor, see DoDispose.
 
   /**
-   * Record an attribute to be set in each peer application.
-   * \param name the name of the attribute to set.
-   * \param value the value of the attribute to set.
+   * Register this type.
+   * \return The object TypeId.
    */
-  void SetPeerAttribute (std::string name, const AttributeValue &value);
+  static TypeId GetTypeId (void);
 
   /**
    * Record an attribute to be set in the first application.
@@ -58,24 +58,58 @@ public:
   void Set2ndAttribute (std::string name, const AttributeValue &value);
 
   /**
+   * Record an attribute to be set in both peer applications.
+   * \param name the name of the attribute to set.
+   * \param value the value of the attribute to set.
+   */
+  void SetPeerAttribute (std::string name, const AttributeValue &value);
+
+  /**
+   * Install peer applications on input nodes.
+   * \param node1st The container of nodes to install the first app.
+   * \param node2nd The container of nodes to install the second app.
+   * \param addr1st The container of IPv4 addresses of the first node.
+   * \param addr2nd The container of IPv4 addresses of the second node.
+   */
+  void Install (
+    NodeContainer nodes1st, NodeContainer nodes2nd,
+    Ipv4InterfaceContainer addr1st, Ipv4InterfaceContainer addr2nd);
+
+  /**
    * Create a pair of peer applications on input nodes.
    * \param node1st The node to install the first app.
    * \param node2nd The node to install the second app.
    * \param addr1st The IPv4 address of the first node.
    * \param addr2nd The IPv4 address of the second mpde.
-   * \param port1st The port number of the first node.
-   * \param port2nd The port number of the second node.
+   * \param portNo The port number for both nodes.
    * \param dscp The DSCP value used to set the socket Type of Service field.
+   * \param startTime The time to start both applications.
    * \return The container with the pair of applications created.
    */
-  ApplicationContainer Install (
-    Ptr<Node> node1st, Ptr<Node> node2nd, Ipv4Address addr1st,
-    Ipv4Address addr2nd, uint16_t port1st, uint16_t port2nd,
-    Ipv4Header::DscpType dscp = Ipv4Header::DscpDefault);
+  ApplicationContainer InstallApp (
+    Ptr<Node> node1st, Ptr<Node> node2nd,
+    Ipv4Address addr1st, Ipv4Address addr2nd,
+    uint16_t portNo, Ipv4Header::DscpType dscp, Time startTime);
+
+protected:
+  /** Destructor implementation. */
+  virtual void DoDispose ();
 
 private:
+  /**
+   * Get the next port number available for use.
+   * \return The port number to use.
+   */
+  static uint16_t GetNextPortNo ();
+
   ObjectFactory m_app1stFactory;   //!< Application factory.
   ObjectFactory m_app2ndFactory;   //!< Application factory.
+
+  uint16_t                    m_numApps;      //!< Number of apps per host.
+  Time                        m_startOff;     //!< Start offset time.
+  Ptr<RandomVariableStream>   m_startRng;     //!< Start interval time.
+  Time                        m_startTime;    //!< The cummulative start time.
+  static uint16_t             m_port;         //!< Port numbers for apps.
 };
 
 } // namespace ns3

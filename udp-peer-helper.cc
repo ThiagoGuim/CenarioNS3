@@ -22,17 +22,49 @@
 
 namespace ns3 {
 
+NS_LOG_COMPONENT_DEFINE ("UdpPeerHelper");
+NS_OBJECT_ENSURE_REGISTERED (UdpPeerHelper);
+
+// Initial port number
+uint16_t UdpPeerHelper::m_port = 10000;
+
 UdpPeerHelper::UdpPeerHelper ()
+  : m_startRng (0),
+  m_startTime (Seconds (0))
 {
+  NS_LOG_FUNCTION (this);
+
   m_app1stFactory.SetTypeId (UdpPeerApp::GetTypeId ());
   m_app2ndFactory.SetTypeId (UdpPeerApp::GetTypeId ());
 }
 
-void
-UdpPeerHelper::SetPeerAttribute (std::string name, const AttributeValue &value)
+UdpPeerHelper::~UdpPeerHelper ()
 {
-  m_app1stFactory.Set (name, value);
-  m_app2ndFactory.Set (name, value);
+  NS_LOG_FUNCTION (this);
+}
+
+TypeId
+UdpPeerHelper::GetTypeId (void)
+{
+  static TypeId tid = TypeId ("ns3::UdpPeerHelper")
+    .SetParent<Object> ()
+    .AddConstructor<UdpPeerHelper> ()
+    .AddAttribute ("NumApps", "The number of apps for each pair of nodes.",
+                   UintegerValue (1),
+                   MakeUintegerAccessor (&UdpPeerHelper::m_numApps),
+                   MakeUintegerChecker<uint16_t> ())
+    .AddAttribute ("StartOffset",
+                   "The initial interval before starting apps.",
+                   TimeValue (Seconds (0)),
+                   MakeTimeAccessor (&UdpPeerHelper::m_startOff),
+                   MakeTimeChecker ())
+    .AddAttribute ("StartInterval",
+                   "A random variable for the interval between app starts.",
+                   StringValue ("ns3::ExponentialRandomVariable[Mean=60.0]"),
+                   MakePointerAccessor (&UdpPeerHelper::m_startRng),
+                   MakePointerChecker<RandomVariableStream> ())
+  ;
+  return tid;
 }
 
 void
@@ -47,11 +79,44 @@ UdpPeerHelper::Set2ndAttribute (std::string name, const AttributeValue &value)
   m_app2ndFactory.Set (name, value);
 }
 
-ApplicationContainer
+void
+UdpPeerHelper::SetPeerAttribute (std::string name, const AttributeValue &value)
+{
+  m_app1stFactory.Set (name, value);
+  m_app2ndFactory.Set (name, value);
+}
+
+void
 UdpPeerHelper::Install (
-  Ptr<Node> node1st, Ptr<Node> node2nd, Ipv4Address addr1st,
-  Ipv4Address addr2nd, uint16_t port1st, uint16_t port2nd,
-  Ipv4Header::DscpType dscp)
+  NodeContainer nodes1st, NodeContainer nodes2nd,
+  Ipv4InterfaceContainer addr1st, Ipv4InterfaceContainer addr2nd)
+{
+  NS_ASSERT_MSG (nodes1st.GetN () == nodes2nd.GetN ()
+                 && addr1st.GetN () == addr2nd.GetN ()
+                 && nodes1st.GetN () == addr1st.GetN (),
+                 "Inconsistent number of nodes or interfaces.");
+
+  // For each pair of nodes, install m_numApps applications.
+  for (uint32_t i = 0; i < nodes1st.GetN (); i++)
+    {
+      m_startTime = m_startOff;
+      for (uint16_t j = 0; j < m_numApps; j++)
+        {
+          m_startTime += Seconds (std::abs (m_startRng->GetValue ()));
+          InstallApp (nodes1st.Get (i), nodes2nd.Get (i),
+                      addr1st.GetAddress (i), addr2nd.GetAddress (i),
+                      GetNextPortNo (), Ipv4Header::DscpDefault, m_startTime);
+          NS_LOG_DEBUG ("App " << j << " at node " << i <<
+                        " will start at " << m_startTime.GetSeconds ());
+        }
+    }
+}
+
+ApplicationContainer
+UdpPeerHelper::InstallApp (
+  Ptr<Node> node1st, Ptr<Node> node2nd,
+  Ipv4Address addr1st, Ipv4Address addr2nd,
+  uint16_t portNo, Ipv4Header::DscpType dscp, Time startTime)
 {
   uint8_t ipTos = dscp << 2;
 
@@ -61,19 +126,35 @@ UdpPeerHelper::Install (
   apps.Add (app1st);
   apps.Add (app2nd);
 
-  InetSocketAddress inetAddr2nd (addr2nd, port2nd);
+  InetSocketAddress inetAddr2nd (addr2nd, portNo);
   inetAddr2nd.SetTos (ipTos);
-  app1st->SetAttribute ("LocalPort", UintegerValue (port1st));
+  app1st->SetAttribute ("LocalPort", UintegerValue (portNo));
   app1st->SetAttribute ("PeerAddress", AddressValue (inetAddr2nd));
   node1st->AddApplication (app1st);
 
-  InetSocketAddress inetAddr1st (addr1st, port1st);
+  InetSocketAddress inetAddr1st (addr1st, portNo);
   inetAddr1st.SetTos (ipTos);
-  app2nd->SetAttribute ("LocalPort", UintegerValue (port2nd));
+  app2nd->SetAttribute ("LocalPort", UintegerValue (portNo));
   app2nd->SetAttribute ("PeerAddress", AddressValue (inetAddr1st));
   node2nd->AddApplication (app2nd);
 
+  Simulator::Schedule (startTime, &UdpPeerApp::StartTraffic, app1st);
+  Simulator::Schedule (startTime, &UdpPeerApp::StartTraffic, app2nd);
+
   return apps;
+}
+
+void
+UdpPeerHelper::DoDispose ()
+{
+  Object::DoDispose ();
+}
+
+uint16_t
+UdpPeerHelper::GetNextPortNo ()
+{
+  NS_ABORT_MSG_IF (m_port == 0xFFFF, "No more ports available for use.");
+  return m_port++;
 }
 
 } // namespace ns3
