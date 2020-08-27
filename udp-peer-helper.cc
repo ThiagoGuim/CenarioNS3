@@ -106,8 +106,8 @@ UdpPeerHelper::Install (
           InstallApp (nodes1st.Get (i), nodes2nd.Get (i),
                       addr1st.GetAddress (i), addr2nd.GetAddress (i),
                       GetNextPortNo (), Ipv4Header::DscpDefault, m_startTime);
-          NS_LOG_DEBUG ("App " << j << " at node " << i <<
-                        " will start at " << m_startTime.GetSeconds ());
+          NS_LOG_INFO ("App " << j << " at node " << i <<
+                       " will start at " << m_startTime.GetSeconds ());
         }
     }
 }
