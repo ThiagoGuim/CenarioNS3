@@ -32,6 +32,7 @@
 #include <string>
 #include "controller.h"
 #include "udp-peer-helper.h"
+#include "slice.h"
 
 
 using namespace ns3;
@@ -114,7 +115,7 @@ main (int argc, char *argv[])
 
   std::string animFile = "animation.xml";
 
-  int simTime = 100;
+  int simTime = 20;
   bool verbose = false;
   bool trace = false;
   bool ofsLog   = false;
@@ -218,131 +219,6 @@ main (int argc, char *argv[])
       //   }
     }
     
-  // for (size_t i = 0; i < apps.GetN(); i++)
-  // {
-  //   Ptr<Application> app = apps.Get(i);
-  //   app->SetStartTime(Seconds(i+1.0));
-  // }
-
-  //
-  // Create a UdpEchoServer application.
-  //
-  /*ApplicationContainer apps;
-  uint16_t port = 9;
-  uint32_t MaxPacketSize = 1024;
-  uint32_t maxPacketCount = 320;
-  Time interPacketInterval = Seconds (0.05);
-
-  for (size_t i = 0; i < numberSlices; i++)
-    {
-
-      //Set the servers up
-      for (size_t j = 0; j < sliceNodes[i][SERVERS].GetN (); j++)
-        {
-          UdpEchoServerHelper server (port);
-          apps = server.Install (sliceNodes[i][SERVERS].Get (j));
-          apps.Start (Seconds (1.0));
-          apps.Stop (Seconds (10.0));
-        }
-
-      //Set the clients up
-      for (size_t j = 0; j < sliceNodes[i][SERVERS].GetN (); j++)
-        {
-          UdpEchoClientHelper client (sliceInterfaces[i][SERVERS].GetAddress (j), port);
-          client.SetAttribute ("MaxPackets", UintegerValue (maxPacketCount));
-          client.SetAttribute ("Interval", TimeValue (interPacketInterval));
-          client.SetAttribute ("PacketSize", UintegerValue (MaxPacketSize));
-          apps = client.Install (sliceNodes[i][ALL_HOSTS].Get (j));
-          apps.Start (Seconds (2.0));
-          apps.Stop (Seconds (10.0));
-        }
-
-    }*/
-
-  // Create the OnOff applications to send data to the UDP receiver
-  /*ApplicationContainer onOffApps;
-  uint16_t port = 9;
-
-  Address sinkLocalAddress (InetSocketAddress (Ipv4Address::GetAny (), port));
-  PacketSinkHelper sinkHelper ("ns3::UdpSocketFactory", sinkLocalAddress);
-  ApplicationContainer sinkApp;
-
-  for (size_t i = 0; i < numberSlices; i++)
-    {
-      for (size_t j = 0; j < sliceNodes[i][SERVERS].GetN (); j++)
-        {
-
-          sinkApp.Add (sinkHelper.Install (sliceNodes[i][SERVERS].Get (j)));
-
-          //Set DSCP field
-          InetSocketAddress serverInetAddr (sliceInterfaces[i][SERVERS].GetAddress (j), port);
-          serverInetAddr.SetTos (15);
-
-          OnOffHelper onOffHelper ("ns3::UdpSocketFactory", serverInetAddr);
-          onOffHelper.SetConstantRate (DataRate ("448kb/s"));
-          onOffApps.Add (onOffHelper.Install (sliceNodes[i][ALL_HOSTS].Get (j)));
-
-        }
-    }
-
-  sinkApp.Start (Seconds (1.0));
-  sinkApp.Stop (Seconds (10.0));
-
-  onOffApps.Start (Seconds (2.0));
-  onOffApps.Stop (Seconds (9.0));*/
-
-  //Configure an UDP-CLIENT-SERVER application
-  /*ApplicationContainer apps;
-  uint16_t port = 4000;
-  uint32_t MaxPacketSize = 1024;
-  uint32_t maxPacketCount = 320;
-  Time interPacketInterval = Seconds (0.05);
-
-  for (size_t i = 0; i < numberSlices; i++)
-    {
-
-      //Set the servers up
-      for(size_t j = 0; j < sliceNodes[i][SERVERS].GetN(); j++){
-        UdpServerHelper server (port);
-        apps = server.Install (sliceNodes[i][SERVERS].Get(j));
-        apps.Start (Seconds (1.0));
-        apps.Stop (Seconds (10.0));
-      }
-
-      //Set the clients up
-      for (size_t j = 0; j < sliceNodes[i][SERVERS].GetN(); j++)
-        {
-          UdpClientHelper client (sliceInterfaces[i][SERVERS].GetAddress(j), port);
-          client.SetAttribute ("MaxPackets", UintegerValue (maxPacketCount));
-          client.SetAttribute ("Interval", TimeValue (interPacketInterval));
-          client.SetAttribute ("PacketSize", UintegerValue (MaxPacketSize));
-          apps = client.Install (sliceNodes[i][ALL_HOSTS].Get(j));
-          apps.Start (Seconds (2.0));
-          apps.Stop (Seconds (10.0));
-        }
-
-    }*/
-
-
-  //Configure ping application between hosts
-  /*ApplicationContainer pingApps;
-
-  for (size_t i = 0; i < numberSlices; i++)
-    {
-
-
-      for (size_t j = 0; j < sliceInterfaces[i][SERVERS].GetN (); j++) //Server Interfaces
-
-        {
-          V4PingHelper pingHelper = V4PingHelper (sliceInterfaces[i][SERVERS].GetAddress (j));
-          pingHelper.SetAttribute ("Verbose", BooleanValue (true));
-          pingApps = pingHelper.Install (sliceNodes[i][ALL_HOSTS].Get (j));
-          pingApps.Start (Seconds (1));
-
-        }
-
-    }*/
-
 
   // Enable datapath stats and pcap traces at hosts, switch(es), and controller(s)
   if (trace)
@@ -374,21 +250,9 @@ main (int argc, char *argv[])
     }
 
 
-  //ArpCache::PopulateArpCaches ();
-
-
   // Run the simulation
   Simulator::Stop (Seconds (simTime));
   Simulator::Run ();
-
-  controllerApp->m_lInfoA->PrintHeader(std::cout);
-  std::cout << std::endl;
-  for (size_t i = 0; i < numberSlices; i++)
-  { 
-    controllerApp->m_lInfoA->PrintValues(std::cout, static_cast<LinkInfo::LinkDir>(0), i);
-    std::cout << std::endl;
-  }
-
   Simulator::Destroy ();
 
 }
