@@ -61,12 +61,12 @@ Slice::GetTypeId (void)
                    UintegerValue (0),
                    MakeUintegerAccessor (&Slice::m_quota),
                    MakeUintegerChecker<uint16_t> ())
-    .AddAttribute ("hostsSWA",
+    .AddAttribute ("HostsSWA",
                    "Number of hosts attached to switch A.",
                    UintegerValue (0),
                    MakeUintegerAccessor (&Slice::m_hostsSWA),
                    MakeUintegerChecker<uint16_t> ())
-    .AddAttribute ("hostsSWB",
+    .AddAttribute ("HostsSWB",
                    "Number of hosts attached to switch B.",
                    UintegerValue (0),
                    MakeUintegerAccessor (&Slice::m_hostsSWB),

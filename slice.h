@@ -26,7 +26,7 @@
 namespace ns3 {
 
 /**
- * This helper will make life easier for setting up UDP peer applications.
+ * 
  */
 class Slice : public Object
 {

@@ -106,7 +106,16 @@ static ns3::GlobalValue
 
 int
 main (int argc, char *argv[])
-{
+{ 
+
+  ObjectFactory sliceFac("ns3::Slice[SliceId=1|Priority=2|Quota=5|HostsSWA=1|HostsSWB=1]");
+  Ptr<Slice> slice = sliceFac.Create<Slice>();
+
+  std::cout << slice->GetSliceId() << std::endl;
+  sliceFac.SetTypeId("ns3::Slice[SliceId=2|Priority=2|Quota=5|HostsSWA=1|HostsSWB=1]");
+  Ptr<Slice> slice2 = sliceFac.Create<Slice>();
+
+  std::cout << slice2->GetSliceId() << std::endl;
 
   // Customizing the OpenFlow queue type on switch ports.
   Config::SetDefault ("ns3::OFSwitch13Port::QueueFactory", StringValue ("ns3::QosQueue"));
@@ -115,7 +124,7 @@ main (int argc, char *argv[])
 
   std::string animFile = "animation.xml";
 
-  int simTime = 20;
+  int simTime = 1;
   bool verbose = false;
   bool trace = false;
   bool ofsLog   = false;
@@ -248,7 +257,6 @@ main (int argc, char *argv[])
 
 
     }
-
 
   // Run the simulation
   Simulator::Stop (Seconds (simTime));
