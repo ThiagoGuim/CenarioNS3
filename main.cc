@@ -114,7 +114,7 @@ main (int argc, char *argv[])
 
   std::string animFile = "animation.xml";
 
-  int simTime = 10;
+  int simTime = 100;
   bool verbose = false;
   bool trace = false;
   bool ofsLog   = false;
@@ -193,8 +193,8 @@ main (int argc, char *argv[])
 
       // Configuring traffic patterns for this slice
       Ptr<UdpPeerHelper> appHelper = CreateObject<UdpPeerHelper> ();
-      // appHelper->SetAttribute ("NumApps", UintegerValue (5));
-      // appHelper->SetAttribute ("StartInterval", PointerValue (startRng));
+      appHelper->SetAttribute ("NumApps", UintegerValue (20));
+      appHelper->SetAttribute ("StartInterval", PointerValue (startRng));
 
       // // Define the packet size and interval for UDP traffic.
       // appHelper->SetPeerAttribute ("PktInterval", StringValue ("ns3::NormalRandomVariable[Mean=0.01|Variance=0.001]"));
@@ -202,6 +202,8 @@ main (int argc, char *argv[])
 
       // // Disable the traffic at the UDP server node.
       // appHelper->Set2ndAttribute ("PktInterval", StringValue ("ns3::ConstantRandomVariable[Constant=1000000]"));
+
+      appHelper->SetPeerAttribute ("SliceId", UintegerValue (i));
 
       appHelper->Install (sliceNodes[i][ALL_HOSTS], sliceNodes[i][SERVERS],
                           sliceInterfaces[i][ALL_HOSTS], sliceInterfaces[i][SERVERS]);
@@ -215,7 +217,7 @@ main (int argc, char *argv[])
 
       //   }
     }
-
+    
   // for (size_t i = 0; i < apps.GetN(); i++)
   // {
   //   Ptr<Application> app = apps.Get(i);
@@ -378,6 +380,15 @@ main (int argc, char *argv[])
   // Run the simulation
   Simulator::Stop (Seconds (simTime));
   Simulator::Run ();
+
+  controllerApp->m_lInfoA->PrintHeader(std::cout);
+  std::cout << std::endl;
+  for (size_t i = 0; i < numberSlices; i++)
+  { 
+    controllerApp->m_lInfoA->PrintValues(std::cout, static_cast<LinkInfo::LinkDir>(0), i);
+    std::cout << std::endl;
+  }
+
   Simulator::Destroy ();
 
 }

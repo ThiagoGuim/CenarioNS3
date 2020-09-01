@@ -21,6 +21,7 @@
 #include <iomanip>
 #include <iostream>
 #include "link-info.h"
+#include "slice-tag.h"
 
 
 using namespace std;
@@ -418,15 +419,15 @@ LinkInfo::NotifyTxPacket (std::string context, Ptr<const Packet> packet)
 {
   NS_LOG_FUNCTION (this << context << packet);
 
-  //LinkInfo::LinkDir dir;
-  //dir = (context == "Forward") ? LinkInfo::FWD : LinkInfo::BWD;
+  LinkInfo::LinkDir dir;
+  dir = (context == "Forward") ? LinkInfo::FWD : LinkInfo::BWD;
 
   // Update TX packets for the packet slice.
-  /*EpcGtpuTag gtpuTag;
-  if (packet->PeekPacketTag (gtpuTag))
+  SliceTag tag;
+  if (packet->PeekPacketTag (tag))
     {
-      SliceId slice = gtpuTag.GetSliceId ();
-      QosType type = gtpuTag.GetQosType ();
+      uint8_t slice = tag.GetSliceId ();
+      QosType type = QosType::NON;
       uint32_t size = packet->GetSize ();
 
       // Update TX packets for the traffic slice and for fake shared slice,
@@ -439,7 +440,7 @@ LinkInfo::NotifyTxPacket (std::string context, Ptr<const Packet> packet)
   else
     {
       NS_LOG_WARN ("GTPU packet tag not found for packet " << packet);
-    }*/
+    }
 }
 
 bool

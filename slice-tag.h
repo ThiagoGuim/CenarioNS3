@@ -31,24 +31,19 @@ namespace ns3 {
 class Tag;
 
 /**
- * Tag used for GTP packets withing LTE EPC.
+ * .
  */
 class SliceTag : public Tag
 {
 public:
-  /** LTE EPC element where this tagged was inserted into the packet */
-  enum EpcInputNode
-  {
-    ENB = 0,  //!< At the eNB node
-    PGW = 1   //!< At the P-GW node
-  };
+  
 
   static TypeId GetTypeId (void);
   virtual TypeId GetInstanceTypeId (void) const;
 
   /** Constructors */
   SliceTag ();
-  //EpcGtpuTag (uint32_t teid, EpcInputNode node, QosType type, bool aggr);
+  SliceTag (uint8_t sliceId);
 
   // Inherited from Tag
   virtual void Serialize (TagBuffer i) const;
@@ -61,38 +56,14 @@ public:
    * \return The requested information.
    */
   //\{
-  //Direction     GetDirection  (void) const;
-  //EpcInputNode  GetInputNode  (void) const;
-  //QosType       GetQosType    (void) const;
-  //SliceId       GetSliceId    (void) const;
-  //uint32_t      GetTeid       (void) const;
   Time          GetTimestamp  (void) const;
-  //bool          IsAggregated  (void) const;
-  uint8_t GetType (void) const;
   uint8_t GetSliceId (void) const;
-  uint64_t GetDpId (void) const;
   //\}
 
-  /**
-   * Get the EPC input node name.
-   * \param node The EPC input node.
-   * \return The string with the EPC input node name.
-   */
-  //static std::string EpcInputNodeStr (EpcInputNode node);
-
 private:
-  /**
-   * Set internal metadata field.
-   * \param node The input node.
-   * \param type The QoS traffic type.
-   * \param aggr True for aggregated traffic.
-   */
-  //void SetMetadata (EpcInputNode node, QosType type, bool aggr);
 
   uint8_t   m_slice;       //!< SliceId.
-  uint8_t  m_type;        //!< GTP teid.
   uint64_t  m_time;        //!< Input timestamp.
-  uint64_t  m_dpId;        //!< Switch datapath.
 
 };
 

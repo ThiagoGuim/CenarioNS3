@@ -106,6 +106,21 @@ public:
   ConfigureMeters (std::vector<int> sliceQuotas);
 
   /**
+   * Periodically check for infrastructure bandwidth utilization over backhaul
+   * links to adjust extra bit rate when in dynamic inter-slice operation mode.
+   */
+  void SlicingDynamicTimeout (void);
+
+  /**
+   * Adjust the infrastructure inter-slicing extra bit rate, depending on the
+   * ExtraStep attribute value and current link configuration.
+   * \param lInfo The link information.
+   * \param dir The link direction.
+   */
+  void SlicingExtraAdjust (Ptr<LinkInfo> lInfo, LinkInfo::LinkDir dir);
+
+
+  /**
    * Apply the infrastructure inter-slicing OpenFlow meters.
    * \param swtch The switch information.
    * \param slice The network slice.
@@ -136,15 +151,16 @@ public:
   OpMode    GetSpareUseMode       (void) const;
   //\}
 
+  //Poiters to link infos
+  Ptr<LinkInfo> m_lInfoA;
+  Ptr<LinkInfo> m_lInfoB;
 
 protected:
   // Inherited from OFSwitch13Controller
   void HandshakeSuccessful (Ptr<const RemoteSwitch> swtch);
 
 private:
-  //Poiters to link infos
-  Ptr<LinkInfo> m_lInfoA;
-  Ptr<LinkInfo> m_lInfoB;
+  
 
   DataRate              m_extraStep;      //!< Extra adjustment step.
   DataRate              m_guardStep;      //!< Dynamic slice link guard.

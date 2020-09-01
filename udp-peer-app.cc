@@ -19,6 +19,7 @@
  */
 
 #include "udp-peer-app.h"
+#include "slice-tag.h"
 
 namespace ns3 {
 
@@ -70,6 +71,10 @@ UdpPeerApp::GetTypeId (void)
                    StringValue ("ns3::ConstantRandomVariable[Constant=60]"),
                    MakePointerAccessor (&UdpPeerApp::m_lengthRng),
                    MakePointerChecker <RandomVariableStream> ())
+    .AddAttribute ("SliceId", "Slice Id.",
+                   UintegerValue (0),
+                   MakeUintegerAccessor (&UdpPeerApp::m_sliceId),
+                   MakeUintegerChecker<uint8_t> ())
   ;
   return tid;
 }
@@ -152,6 +157,9 @@ UdpPeerApp::SendPacket ()
   NS_LOG_FUNCTION (this);
 
   Ptr<Packet> packet = Create<Packet> (m_pktSizeRng->GetInteger ());
+  SliceTag tag(m_sliceId);
+  packet->AddPacketTag(tag);
+  
   int bytes = m_localSocket->Send (packet);
   if (bytes == static_cast<int> (packet->GetSize ()))
     {

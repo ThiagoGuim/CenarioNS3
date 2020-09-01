@@ -74,6 +74,7 @@ private:
   Ptr<RandomVariableStream>   m_pktInterRng;    //!< Packet interval time.
   Ptr<RandomVariableStream>   m_pktSizeRng;     //!< Packet size.
   Ptr<RandomVariableStream>   m_lengthRng;      //!< Traffic length.
+  uint8_t                     m_sliceId;        //!< Slice Id.
   EventId                     m_sendEvent;      //!< SendPacket event.
 };
 
