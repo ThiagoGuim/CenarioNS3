@@ -24,7 +24,7 @@
 #include "ns3/tag.h"
 #include "ns3/nstime.h"
 #include "ns3/simulator.h"
-#include "common.h"
+#include "../common.h"
 
 namespace ns3 {
 
@@ -58,12 +58,14 @@ public:
   //\{
   Time          GetTimestamp  (void) const;
   uint8_t GetSliceId (void) const;
+  uint8_t GetType (void) const;
   //\}
 
 private:
 
   uint8_t   m_slice;       //!< SliceId.
   uint64_t  m_time;        //!< Input timestamp.
+  uint8_t  m_type;        //!< GBR or NON-GBR.
 
 };
 

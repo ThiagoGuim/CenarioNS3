@@ -296,11 +296,11 @@ Controller::NotifySwitches (PortsVector_t interSwitchesPorts,
 
 
 void
-Controller::ConfigureMeters (std::vector<int> sliceQuotas)
+Controller::ConfigureMeters (std::vector<Ptr<Slice>> slices)
 {
 
 
-  for (size_t sliceId = 0; sliceId < m_numberSlices; sliceId++)
+  for(std::vector<Ptr<Slice>>::iterator it = slices.begin(); it != slices.end(); ++it)
     {
       // Install slicing meters in both link directions.
       for (int d = 0; d < N_LINK_DIRS; d++)
@@ -308,8 +308,8 @@ Controller::ConfigureMeters (std::vector<int> sliceQuotas)
           LinkInfo::LinkDir dir = static_cast<LinkInfo::LinkDir> (d);
 
           bool success = true;
-          success &= m_lInfoA->UpdateQuota (dir, sliceId, sliceQuotas[sliceId]);
-          success &= m_lInfoB->UpdateQuota (dir, sliceId, sliceQuotas[sliceId]);
+          success &= m_lInfoA->UpdateQuota (dir, (*it)->GetSliceId(), (*it)->GetQuota());
+          success &= m_lInfoB->UpdateQuota (dir, (*it)->GetSliceId(), (*it)->GetQuota());
           NS_ASSERT_MSG (success, "Error when setting slice quotas.");
 
         }

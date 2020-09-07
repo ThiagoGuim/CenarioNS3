@@ -19,7 +19,7 @@
  */
 
 #include "udp-peer-app.h"
-#include "slice-tag.h"
+#include "../Metadata/slice-tag.h"
 
 namespace ns3 {
 

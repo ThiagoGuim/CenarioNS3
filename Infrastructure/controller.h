@@ -23,8 +23,9 @@
 #include <ns3/internet-module.h>
 #include <ns3/ofswitch13-module.h>
 
-#include "link-info.h"
-#include "qos-queue.h"
+#include "../Metadata/link-info.h"
+#include "../Infrastructure/qos-queue.h"
+#include "../Metadata/slice.h"
 
 namespace ns3 {
 
@@ -103,7 +104,7 @@ public:
    * \return void.
    */
   void
-  ConfigureMeters (std::vector<int> sliceQuotas);
+  ConfigureMeters (std::vector<Ptr<Slice>> slices);
 
   /**
    * Periodically check for infrastructure bandwidth utilization over backhaul

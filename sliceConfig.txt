@@ -1,0 +1,5 @@
+ns3::Slice[Priority=3|Quota=1|HostsSWA=3|HostsSWB=2]
+ns3::Slice[Priority=2|Quota=1|HostsSWA=1|HostsSWB=0]
+ns3::Slice[Priority=1|Quota=1|HostsSWA=2|HostsSWB=1]
+ns3::Slice[Priority=5|Quota=1|HostsSWA=1|HostsSWB=3]
+ns3::Slice[Priority=1|Quota=1|HostsSWA=5|HostsSWB=6]

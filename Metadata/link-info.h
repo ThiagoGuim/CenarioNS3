@@ -25,7 +25,7 @@
 #include <ns3/csma-module.h>
 #include <ns3/network-module.h>
 #include <ns3/ofswitch13-module.h>
-#include "common.h"
+#include "../common.h"
 
 namespace ns3 {
 

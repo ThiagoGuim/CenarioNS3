@@ -31,13 +31,15 @@ NS_OBJECT_ENSURE_REGISTERED (SliceTag);
 
 SliceTag::SliceTag ()
   : m_slice (0),
-  m_time (Simulator::Now ().GetTimeStep ())
+  m_time (Simulator::Now ().GetTimeStep ()),
+  m_type (0)
 {
 }
 
 SliceTag::SliceTag (uint8_t sliceId)
   : m_slice (sliceId),
-  m_time (Simulator::Now ().GetTimeStep ())
+  m_time (Simulator::Now ().GetTimeStep ()),
+  m_type (0)
 {
 }
 
@@ -60,7 +62,7 @@ SliceTag::GetInstanceTypeId (void) const
 uint32_t
 SliceTag::GetSerializedSize (void) const
 {
-  return 9;
+  return 10;
 }
 
 void
@@ -68,6 +70,7 @@ SliceTag::Serialize (TagBuffer i) const
 {
   i.WriteU8  (m_slice);
   i.WriteU64  (m_time); 
+  i.WriteU8  (m_type);
 }
 
 void
@@ -76,6 +79,7 @@ SliceTag::Deserialize (TagBuffer i)
 
   m_slice = i.ReadU8 ();
   m_time = i.ReadU64 ();
+  m_type = i.ReadU8 ();
 
 }
 
@@ -90,6 +94,12 @@ uint8_t
 SliceTag::GetSliceId () const
 {
   return m_slice;
+}
+
+uint8_t
+SliceTag::GetType () const
+{
+  return m_type;
 }
 
 Time
