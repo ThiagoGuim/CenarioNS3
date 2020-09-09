@@ -1,5 +1,1 @@
-ns3::SliceInfo[Priority=3|Quota=1|HostsA=3|HostsB=2]
-ns3::SliceInfo[Priority=2|Quota=1|HostsA=1|HostsB=0]
-ns3::SliceInfo[Priority=1|Quota=1|HostsA=2|HostsB=1]
-ns3::SliceInfo[Priority=5|Quota=1|HostsA=1|HostsB=3]
-ns3::SliceInfo[Priority=1|Quota=1|HostsA=5|HostsB=6]
+ns3::SliceInfo[Priority=3|Quota=10|HostsA=3|HostsB=2]

@@ -74,7 +74,7 @@ size_t numberHostsSWA = 0;
 size_t numberHostsSWB = 0;
 
 //Vector to allocate the pointers to the slice objects
-std::vector<Ptr<SliceInfo> > slices;
+SliceInfoList_t slices;
 
 //Vectors to allocate the ports of the switches
 TopologyPorts_t switchPorts;
@@ -444,12 +444,13 @@ configureSlices (std::string config)
 
       getline (file, buffer);
 
+
       ObjectFactory sliceFac;
       parse (buffer, sliceFac);
-      sliceFac.Set ("SliceId", UintegerValue (numberSlices));
+      sliceFac.Set ("SliceId", UintegerValue (numberSlices + 1));
       Ptr<SliceInfo> slice = sliceFac.Create<SliceInfo>();
 
-      currSlice = slice->GetSliceId ();
+      currSlice = (slice->GetSliceId () - 1);
       currQuota = slice->GetQuota ();
       currNumberHostsSWA = slice->GetHostsA ();
       currNumberHostsSWB = slice->GetHostsB ();
@@ -457,11 +458,7 @@ configureSlices (std::string config)
       numberHostsSWB += currNumberHostsSWB;
       maxQuota += currQuota;
 
-      NS_ASSERT_MSG (currQuota >= 1, "Invalid Quota");
       NS_ASSERT_MSG (maxQuota <= 100, "Quota exceeded");
-      NS_ASSERT_MSG (numberHostsSWA < 255, "Number of hostsSWA exceeded");
-      NS_ASSERT_MSG (numberHostsSWB < 255, "Number of hostsSWB exceeded");
-      NS_ASSERT_MSG (numberSlices < 255, "Number of slices exceeded");
 
       slices.push_back (slice);
 
