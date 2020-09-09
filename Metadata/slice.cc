@@ -24,10 +24,14 @@
 
 namespace ns3 {
 
-NS_LOG_COMPONENT_DEFINE ("Slice");
-NS_OBJECT_ENSURE_REGISTERED (Slice);
+NS_LOG_COMPONENT_DEFINE ("SliceInfo");
+NS_OBJECT_ENSURE_REGISTERED (SliceInfo);
 
-Slice::Slice ()
+// Initializing Slice static members.
+SliceInfo::SliceInfoMap_t SliceInfo::m_sliceInfoById;
+SliceInfoList_t SliceInfo::m_sliceInfoList;
+
+SliceInfo::SliceInfo ()
   : m_sliceId (0),
   m_prio (0),
   m_quota (0),
@@ -37,43 +41,43 @@ Slice::Slice ()
   NS_LOG_FUNCTION (this);
 }
 
-Slice::~Slice ()
+SliceInfo::~SliceInfo ()
 {
   NS_LOG_FUNCTION (this);
 }
 
 TypeId
-Slice::GetTypeId (void)
+SliceInfo::GetTypeId (void)
 {
-  static TypeId tid = TypeId ("ns3::Slice")
+  static TypeId tid = TypeId ("ns3::SliceInfo")
     .SetParent<Object> ()
-    .AddConstructor<Slice> ()
+    .AddConstructor<SliceInfo> ()
     .AddAttribute ("SliceId", "Slice identifier.",
                    UintegerValue (0),
-                   MakeUintegerAccessor (&Slice::m_sliceId),
+                   MakeUintegerAccessor (&SliceInfo::m_sliceId),
                    MakeUintegerChecker<uint16_t> (SLICE_UNKN, N_MAX_SLICES))
     .AddAttribute ("Priority", "Slice priority.",
                    UintegerValue (0),
-                   MakeUintegerAccessor (&Slice::m_prio),
+                   MakeUintegerAccessor (&SliceInfo::m_prio),
                    MakeUintegerChecker<uint16_t> ())
     .AddAttribute ("Quota", "Slice quota.",
                    UintegerValue (0),
-                   MakeUintegerAccessor (&Slice::m_quota),
+                   MakeUintegerAccessor (&SliceInfo::m_quota),
                    MakeUintegerChecker<uint16_t> (0, 100))
     .AddAttribute ("HostsA", "Number of hosts attached to switch A.",
                    UintegerValue (0),
-                   MakeUintegerAccessor (&Slice::m_hostsA),
+                   MakeUintegerAccessor (&SliceInfo::m_hostsA),
                    MakeUintegerChecker<uint16_t> (0, 255))
     .AddAttribute ("HostsB", "Number of hosts attached to switch B.",
                    UintegerValue (0),
-                   MakeUintegerAccessor (&Slice::m_hostsB),
+                   MakeUintegerAccessor (&SliceInfo::m_hostsB),
                    MakeUintegerChecker<uint16_t> (0, 255))
   ;
   return tid;
 }
 
 void
-Slice::SetSliceId (uint16_t value)
+SliceInfo::SetSliceId (uint16_t value)
 {
   NS_LOG_FUNCTION (this << value);
 
@@ -81,7 +85,7 @@ Slice::SetSliceId (uint16_t value)
 }
 
 void
-Slice::SetPriority (uint16_t value)
+SliceInfo::SetPriority (uint16_t value)
 {
   NS_LOG_FUNCTION (this << value);
 
@@ -89,7 +93,7 @@ Slice::SetPriority (uint16_t value)
 }
 
 void
-Slice::SetQuota (uint16_t value)
+SliceInfo::SetQuota (uint16_t value)
 {
   NS_LOG_FUNCTION (this << value);
 
@@ -97,7 +101,7 @@ Slice::SetQuota (uint16_t value)
 }
 
 void
-Slice::SetHostsA (uint16_t value)
+SliceInfo::SetHostsA (uint16_t value)
 {
   NS_LOG_FUNCTION (this << value);
 
@@ -105,7 +109,7 @@ Slice::SetHostsA (uint16_t value)
 }
 
 void
-Slice::SetHostsB (uint16_t value)
+SliceInfo::SetHostsB (uint16_t value)
 {
   NS_LOG_FUNCTION (this << value);
 
@@ -113,39 +117,50 @@ Slice::SetHostsB (uint16_t value)
 }
 
 uint16_t
-Slice::GetSliceId (void) const
+SliceInfo::GetSliceId (void) const
 {
   return m_sliceId;
 }
 
 uint16_t
-Slice::GetPriority (void) const
+SliceInfo::GetPriority (void) const
 {
   return m_prio;
 }
 
 uint16_t
-Slice::GetQuota (void) const
+SliceInfo::GetQuota (void) const
 {
   return m_quota;
 }
 
 uint16_t
-Slice::GetHostsA (void) const
+SliceInfo::GetHostsA (void) const
 {
   return m_hostsA;
 }
 
 uint16_t
-Slice::GetHostsB (void) const
+SliceInfo::GetHostsB (void) const
 {
   return m_hostsB;
 }
 
 void
-Slice::DoDispose ()
+SliceInfo::DoDispose ()
 {
   Object::DoDispose ();
+}
+
+void
+SliceInfo::RegisterSliceInfo (Ptr<SliceInfo> sInfo)
+{
+  uint16_t key = sInfo->GetSliceId ();
+  std::pair<uint16_t, Ptr<SliceInfo> > entry (key, sInfo);
+  auto ret = SliceInfo::m_sliceInfoById.insert (entry);
+  NS_ABORT_MSG_IF (ret.second == false, "Existing slice info for this key");
+
+  SliceInfo::m_sliceInfoList.push_back (sInfo);
 }
 
 } // namespace ns3

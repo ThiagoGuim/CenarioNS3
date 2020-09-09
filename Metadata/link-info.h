@@ -36,9 +36,6 @@ class LinkInfo;
 /** A list of link information objects. */
 typedef std::vector<Ptr<LinkInfo> > LinkInfoList_t;
 
-/** A set of link information objects. */
-typedef std::set<Ptr<LinkInfo> > LinkInfoSet_t;
-
 /**
  * \ingroup svelteInfra
  * Metadata associated to a link between two OpenFlow switches.

@@ -19,21 +19,26 @@
  *         Luciano Chaves <luciano.chaves@ice.ufjf.br>
  */
 
-#ifndef SLICE_H
-#define SLICE_H
+#ifndef SLICE_INFO_H
+#define SLICE_INFO_H
 
 #include <ns3/core-module.h>
 
 namespace ns3 {
 
+class SliceInfo;
+
+/** A list of slice information objects. */
+typedef std::vector<Ptr<SliceInfo> > SliceInfoList_t;
+
 /**
  * Class for slice metadata.
  */
-class Slice : public Object
+class SliceInfo : public Object
 {
 public:
-  Slice ();           //!< Default constructor.
-  virtual ~Slice ();  //!< Dummy destructor, see DoDispose.
+  SliceInfo ();           //!< Default constructor.
+  virtual ~SliceInfo ();  //!< Dummy destructor, see DoDispose.
 
   /**
    * Register this type.
@@ -70,12 +75,25 @@ protected:
   virtual void DoDispose ();
 
 private:
+  /**
+   * Register the slice information in global map for further usage.
+   * \param lInfo The slice information to save.
+   */
+  static void RegisterSliceInfo (Ptr<SliceInfo> sliceInfo);
+
   uint16_t m_sliceId;      //!< Slice identifier.
   uint16_t m_prio;         //!< Slice priority.
   uint16_t m_quota;        //!< Slice quota.
   uint16_t m_hostsA;       //!< Number of hosts attached to switch A.
   uint16_t m_hostsB;       //!< Number of hosts attached to switch B.
+
+  /**
+   * Map saving slice ID / slice information.
+   */
+  typedef std::map<uint16_t, Ptr<SliceInfo> > SliceInfoMap_t;
+  static SliceInfoMap_t  m_sliceInfoById;   //!< Global slice info map.
+  static SliceInfoList_t m_sliceInfoList;   //!< Global list of slice info.
 };
 
 } // namespace ns3
-#endif /* SLICE_H */
+#endif /* SLICE_INFO_H */

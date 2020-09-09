@@ -74,7 +74,7 @@ size_t numberHostsSWA = 0;
 size_t numberHostsSWB = 0;
 
 //Vector to allocate the pointers to the slice objects
-std::vector<Ptr<Slice>> slices;
+std::vector<Ptr<SliceInfo>> slices;
 
 //Vectors to allocate the ports of the switches
 TopologyPorts_t switchPorts;
@@ -412,7 +412,7 @@ createAnimation ()
 
 // Comparator for slice priorities.
 bool
-PriComp (Ptr<Slice> slice1, Ptr<Slice> slice2)
+PriComp (Ptr<SliceInfo> slice1, Ptr<SliceInfo> slice2)
 {
   return slice1->GetPriority() < slice2->GetPriority();
 }
@@ -445,7 +445,7 @@ configureSlices(std::string config){
     ObjectFactory sliceFac;
     parse(buffer, sliceFac);
     sliceFac.Set("SliceId", UintegerValue(numberSlices));
-    Ptr<Slice> slice = sliceFac.Create<Slice>();
+    Ptr<SliceInfo> slice = sliceFac.Create<SliceInfo>();
 
     currSlice = slice->GetSliceId();
     currQuota = slice->GetQuota();
@@ -590,7 +590,7 @@ configureSlices(std::string config){
 
   std::stable_sort (slices.begin (), slices.end (), PriComp);
 
-  for(std::vector<Ptr<Slice>>::iterator it = slices.begin(); it != slices.end(); ++it){
+  for(std::vector<Ptr<SliceInfo>>::iterator it = slices.begin(); it != slices.end(); ++it){
     std::cout << "SliceId = " << (*it)->GetSliceId() << "| ";
     std::cout << "Prio = " << (*it)->GetPriority() << "| ";
     std::cout << "Quota = " << (*it)->GetQuota() << "| ";

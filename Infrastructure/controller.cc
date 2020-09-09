@@ -188,11 +188,11 @@ Controller::NotifySwitches (PortsVector_t interSwitchesPorts,
 
 
 void
-Controller::ConfigureMeters (std::vector<Ptr<Slice>> slices)
+Controller::ConfigureMeters (std::vector<Ptr<SliceInfo>> slices)
 {
 
 
-  for(std::vector<Ptr<Slice>>::iterator it = slices.begin(); it != slices.end(); ++it)
+  for(std::vector<Ptr<SliceInfo>>::iterator it = slices.begin(); it != slices.end(); ++it)
     {
       // Install slicing meters in both link directions.
       for (int d = 0; d < N_LINK_DIRS; d++)

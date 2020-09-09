@@ -82,7 +82,7 @@ public:
    * \param sliceQuotas Vector that contains the slice quotas.
    * \return void.
    */
-  void ConfigureMeters (std::vector<Ptr<Slice>> slices);
+  void ConfigureMeters (std::vector<Ptr<SliceInfo>> slices);
 
 protected:
   /** Destructor implementation */
