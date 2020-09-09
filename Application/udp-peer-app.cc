@@ -71,10 +71,15 @@ UdpPeerApp::GetTypeId (void)
                    StringValue ("ns3::ConstantRandomVariable[Constant=60]"),
                    MakePointerAccessor (&UdpPeerApp::m_lengthRng),
                    MakePointerChecker <RandomVariableStream> ())
-    .AddAttribute ("SliceId", "Slice Id.",
+    .AddAttribute ("SliceId", "Slice identifier.",
                    UintegerValue (0),
                    MakeUintegerAccessor (&UdpPeerApp::m_sliceId),
                    MakeUintegerChecker<uint8_t> ())
+    .AddAttribute ("QosType", "Traffic QoS indicator.",
+                   EnumValue (QosType::NON),
+                   MakeEnumAccessor (&UdpPeerApp::m_qosType),
+                   MakeEnumChecker (QosType::NON, QosTypeStr (QosType::NON),
+                                    QosType::GBR, QosTypeStr (QosType::GBR)))
   ;
   return tid;
 }
@@ -157,9 +162,9 @@ UdpPeerApp::SendPacket ()
   NS_LOG_FUNCTION (this);
 
   Ptr<Packet> packet = Create<Packet> (m_pktSizeRng->GetInteger ());
-  SliceTag tag(m_sliceId);
-  packet->AddPacketTag(tag);
-  
+  SliceTag tag (m_sliceId, m_qosType);
+  packet->AddPacketTag (tag);
+
   int bytes = m_localSocket->Send (packet);
   if (bytes == static_cast<int> (packet->GetSize ()))
     {

@@ -24,6 +24,7 @@
 #include <ns3/core-module.h>
 #include <ns3/network-module.h>
 #include <ns3/internet-module.h>
+#include "../common.h"
 
 namespace ns3 {
 
@@ -75,6 +76,7 @@ private:
   Ptr<RandomVariableStream>   m_pktSizeRng;     //!< Packet size.
   Ptr<RandomVariableStream>   m_lengthRng;      //!< Traffic length.
   uint8_t                     m_sliceId;        //!< Slice Id.
+  QosType                     m_qosType;        //!< Traffic QoS type.
   EventId                     m_sendEvent;      //!< SendPacket event.
 };
 
