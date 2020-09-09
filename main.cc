@@ -74,7 +74,7 @@ size_t numberHostsSWA = 0;
 size_t numberHostsSWB = 0;
 
 //Vector to allocate the pointers to the slice objects
-std::vector<Ptr<SliceInfo>> slices;
+std::vector<Ptr<SliceInfo> > slices;
 
 //Vectors to allocate the ports of the switches
 TopologyPorts_t switchPorts;
@@ -158,7 +158,7 @@ main (int argc, char *argv[])
       configureSwitches ();
       controllerApp->NotifySwitches (interSwitchesPorts, switchDevices);
 
-      configureSlices(config);
+      configureSlices (config);
       controllerApp->NotifyClientsServers (sliceInterfaces, switchPorts);
 
       controllerApp->ConfigureMeters (slices);
@@ -254,65 +254,65 @@ main (int argc, char *argv[])
 
 void
 parse (std::string v, ObjectFactory &factory)
- {
+{
 
-   std::string::size_type lbracket, rbracket;
-   lbracket = v.find ("[");
-   rbracket = v.find ("]");
-   if (lbracket == std::string::npos && rbracket == std::string::npos)
-     {
-       factory.SetTypeId (v);
-       return;
-     }
-   if (lbracket == std::string::npos || rbracket == std::string::npos)
-     {
-       return;
-     }
-   NS_ASSERT (lbracket != std::string::npos);
-   NS_ASSERT (rbracket != std::string::npos);
-   std::string tid = v.substr (0, lbracket);
-   std::string parameters = v.substr (lbracket + 1,rbracket - (lbracket + 1));
-   factory.SetTypeId (tid);
-   std::string::size_type cur;
-   cur = 0;
-   while (cur != parameters.size ())
-     {
-       std::string::size_type equal = parameters.find ("=", cur);
-       if (equal == std::string::npos)
-         {
-           break;
-         }
-       else
-         {
-           std::string name = parameters.substr (cur, equal - cur);
-           struct TypeId::AttributeInformation info;
-           if (!factory.GetTypeId().LookupAttributeByName (name, &info))
-             {
-               break;
-             }
-           else
-             {
-               std::string::size_type next = parameters.find ("|", cur);
-               std::string value;
-               if (next == std::string::npos)
-                 {
-                   value = parameters.substr (equal + 1, parameters.size () - (equal + 1));
-                   cur = parameters.size ();
-                 }
-               else
-                 {
-                   value = parameters.substr (equal + 1, next - (equal + 1));
-                   cur = next + 1;
-                 }
+  std::string::size_type lbracket, rbracket;
+  lbracket = v.find ("[");
+  rbracket = v.find ("]");
+  if (lbracket == std::string::npos && rbracket == std::string::npos)
+    {
+      factory.SetTypeId (v);
+      return;
+    }
+  if (lbracket == std::string::npos || rbracket == std::string::npos)
+    {
+      return;
+    }
+  NS_ASSERT (lbracket != std::string::npos);
+  NS_ASSERT (rbracket != std::string::npos);
+  std::string tid = v.substr (0, lbracket);
+  std::string parameters = v.substr (lbracket + 1,rbracket - (lbracket + 1));
+  factory.SetTypeId (tid);
+  std::string::size_type cur;
+  cur = 0;
+  while (cur != parameters.size ())
+    {
+      std::string::size_type equal = parameters.find ("=", cur);
+      if (equal == std::string::npos)
+        {
+          break;
+        }
+      else
+        {
+          std::string name = parameters.substr (cur, equal - cur);
+          struct TypeId::AttributeInformation info;
+          if (!factory.GetTypeId ().LookupAttributeByName (name, &info))
+            {
+              break;
+            }
+          else
+            {
+              std::string::size_type next = parameters.find ("|", cur);
+              std::string value;
+              if (next == std::string::npos)
+                {
+                  value = parameters.substr (equal + 1, parameters.size () - (equal + 1));
+                  cur = parameters.size ();
+                }
+              else
+                {
+                  value = parameters.substr (equal + 1, next - (equal + 1));
+                  cur = next + 1;
+                }
 
-              factory.Set(name, StringValue(value));
+              factory.Set (name, StringValue (value));
 
-             }
-         }
-     }
+            }
+        }
+    }
 
-   return;
- }
+  return;
+}
 
 void
 printPorts ()
@@ -414,17 +414,18 @@ createAnimation ()
 bool
 PriComp (Ptr<SliceInfo> slice1, Ptr<SliceInfo> slice2)
 {
-  return slice1->GetPriority() < slice2->GetPriority();
+  return slice1->GetPriority () < slice2->GetPriority ();
 }
 
 void
-configureSlices(std::string config){
+configureSlices (std::string config)
+{
 
   std::ifstream file;
-  file.open(config);
+  file.open (config);
   std::string buffer;
 
-  NS_ASSERT_MSG (file.is_open(), "Error while opening the file");
+  NS_ASSERT_MSG (file.is_open (), "Error while opening the file");
 
   int maxQuota = 0;
   int currQuota;
@@ -438,167 +439,169 @@ configureSlices(std::string config){
   std::string baseAddressStr = "0.x.y.1";
   Ipv4Address baseAddress;
 
-  while(!file.eof()){
+  while (!file.eof ())
+    {
 
-    getline(file, buffer);
+      getline (file, buffer);
 
-    ObjectFactory sliceFac;
-    parse(buffer, sliceFac);
-    sliceFac.Set("SliceId", UintegerValue(numberSlices));
-    Ptr<SliceInfo> slice = sliceFac.Create<SliceInfo>();
+      ObjectFactory sliceFac;
+      parse (buffer, sliceFac);
+      sliceFac.Set ("SliceId", UintegerValue (numberSlices));
+      Ptr<SliceInfo> slice = sliceFac.Create<SliceInfo>();
 
-    currSlice = slice->GetSliceId();
-    currQuota = slice->GetQuota();
-    currNumberHostsSWA = slice->GetHostsA();
-    currNumberHostsSWB = slice->GetHostsB();
-    numberHostsSWA += currNumberHostsSWA;
-    numberHostsSWB += currNumberHostsSWB;
-    maxQuota += currQuota;
+      currSlice = slice->GetSliceId ();
+      currQuota = slice->GetQuota ();
+      currNumberHostsSWA = slice->GetHostsA ();
+      currNumberHostsSWB = slice->GetHostsB ();
+      numberHostsSWA += currNumberHostsSWA;
+      numberHostsSWB += currNumberHostsSWB;
+      maxQuota += currQuota;
 
-    NS_ASSERT_MSG (currQuota >= 1, "Invalid Quota");
-    NS_ASSERT_MSG (maxQuota <= 100, "Quota exceeded");
-    NS_ASSERT_MSG (numberHostsSWA < 255, "Number of hostsSWA exceeded");
-    NS_ASSERT_MSG (numberHostsSWB < 255, "Number of hostsSWB exceeded");
-    NS_ASSERT_MSG (numberSlices < 255, "Number of slices exceeded");
+      NS_ASSERT_MSG (currQuota >= 1, "Invalid Quota");
+      NS_ASSERT_MSG (maxQuota <= 100, "Quota exceeded");
+      NS_ASSERT_MSG (numberHostsSWA < 255, "Number of hostsSWA exceeded");
+      NS_ASSERT_MSG (numberHostsSWB < 255, "Number of hostsSWB exceeded");
+      NS_ASSERT_MSG (numberSlices < 255, "Number of slices exceeded");
 
-    slices.push_back(slice);
+      slices.push_back (slice);
 
-    //Creates the NodeContainers and assign them to the respective slice
-    NodeContainer hostsSWA;
-    NodeContainer hostsSWB;
-    NodeContainer servers;
+      //Creates the NodeContainers and assign them to the respective slice
+      NodeContainer hostsSWA;
+      NodeContainer hostsSWB;
+      NodeContainer servers;
 
-    hostsSWA.Create (currNumberHostsSWA);
-    hostsSWB.Create (currNumberHostsSWB);
-    servers.Create (currNumberHostsSWA + currNumberHostsSWB);
+      hostsSWA.Create (currNumberHostsSWA);
+      hostsSWB.Create (currNumberHostsSWB);
+      servers.Create (currNumberHostsSWA + currNumberHostsSWB);
 
-    std::vector<NodeContainer> machines;
+      std::vector<NodeContainer> machines;
 
-    machines.push_back (hostsSWA);
-    machines.push_back (hostsSWB);
-    machines.push_back (servers);
-
-
-    NodeContainer allHostsPerSliceContainer (hostsSWA, hostsSWB);
-
-    machines.push_back (allHostsPerSliceContainer);
-
-    sliceNodes.push_back (machines);
-
-    //Configure the CSMA links between hosts and switches for each devices
-    std::vector<Ptr<OFSwitch13Port> > hostsSWAports;
-    std::vector<Ptr<OFSwitch13Port> > hostsSWBports;
-    std::vector<Ptr<OFSwitch13Port> > serverPorts;
-
-    std::vector<std::vector<Ptr<OFSwitch13Port> > > ports;
-
-    ports.push_back (hostsSWAports);
-    ports.push_back (hostsSWBports);
-    ports.push_back (serverPorts);
-
-    switchPorts.push_back (ports);
-
-    NetDeviceContainer hostDevicesSWA;
-    NetDeviceContainer hostDevicesSWB;
-    NetDeviceContainer serversDevices;
-
-    //Configuring CSMA links of the hostsSWA
-    for (size_t j = 0; j < sliceNodes[currSlice][HOSTS_SWA].GetN (); j++)
-      {
-        pairDevs = csmaHelperEndPoints.Install (sliceNodes[currSlice][HOSTS_SWA].Get (j), switches.Get (0));
-        hostDevicesSWA.Add (pairDevs.Get (0));
-        switchPorts[currSlice][HOSTS_SWA].push_back (switchDevices.Get (0)->AddSwitchPort (pairDevs.Get (1)));
-      }
-
-    //Configuring CSMA links of the hostsSWB
-    for (size_t j = 0; j < sliceNodes[currSlice][HOSTS_SWB].GetN (); j++)
-      {
-        pairDevs = csmaHelperEndPoints.Install (sliceNodes[currSlice][HOSTS_SWB].Get (j), switches.Get (1));
-        hostDevicesSWB.Add (pairDevs.Get (0));
-        switchPorts[currSlice][HOSTS_SWB].push_back (switchDevices.Get (1)->AddSwitchPort (pairDevs.Get (1)));
-      }
-
-    //Configuring CSMA links of the servers
-    for (size_t j = 0; j < sliceNodes[currSlice][SERVERS].GetN (); j++)
-      {
-        pairDevs = csmaHelperEndPoints.Install (sliceNodes[currSlice][SERVERS].Get (j), switches.Get (2));
-        serversDevices.Add (pairDevs.Get (0));
-        switchPorts[currSlice][SERVERS].push_back (switchDevices.Get (2)->AddSwitchPort (pairDevs.Get (1)));
-      }
-
-    std::vector<NetDeviceContainer> devices;
-
-    devices.push_back (hostDevicesSWA);
-    devices.push_back (hostDevicesSWB);
-    devices.push_back (serversDevices);
-
-    sliceNetDevices.push_back (devices);
-
-    //Install the TCP/IP stack into hosts nodes (All hosts of all slices)
-    internet.Install (sliceNodes[currSlice][HOSTS_SWA]); //HostsSWA
-    internet.Install (sliceNodes[currSlice][HOSTS_SWB]); //HostsSWB
-    internet.Install (sliceNodes[currSlice][SERVERS]); //Servers
-
-    //Set IPv4 host addresses
-    Ipv4InterfaceContainer hostIpIfacesSWA;
-    Ipv4InterfaceContainer hostIpIfacesSWB;
-    Ipv4InterfaceContainer serversIpIfaces;
-
-    std::string baseAddressTmp = baseAddressStr;
-
-    //Number to identify if the address is given to a host or a server
-    int hostServer = 1;
-
-    std::string slice_id = std::to_string (currSlice);
-    std::string hostServer_str = std::to_string (hostServer);
-
-    boost::replace_all (baseAddressTmp, "x", slice_id);
-    boost::replace_all (baseAddressTmp, "y", hostServer_str);
-
-    baseAddress.Set (baseAddressTmp.c_str ());
-    ipv4helpr.SetBase ("10.0.0.0", "255.0.0.0", baseAddress);
-    hostIpIfacesSWA = ipv4helpr.Assign (sliceNetDevices[currSlice][HOSTS_SWA]); //hostDevicesSWA
-    hostIpIfacesSWB = ipv4helpr.Assign (sliceNetDevices[currSlice][HOSTS_SWB]); //hostDevicesSWB
+      machines.push_back (hostsSWA);
+      machines.push_back (hostsSWB);
+      machines.push_back (servers);
 
 
-    baseAddressTmp = baseAddressStr;
-    hostServer = hostServer + 1;
-    hostServer_str = std::to_string (hostServer);
-    boost::replace_all (baseAddressTmp, "x", slice_id);
-    boost::replace_all (baseAddressTmp, "y", hostServer_str);
+      NodeContainer allHostsPerSliceContainer (hostsSWA, hostsSWB);
+
+      machines.push_back (allHostsPerSliceContainer);
+
+      sliceNodes.push_back (machines);
+
+      //Configure the CSMA links between hosts and switches for each devices
+      std::vector<Ptr<OFSwitch13Port> > hostsSWAports;
+      std::vector<Ptr<OFSwitch13Port> > hostsSWBports;
+      std::vector<Ptr<OFSwitch13Port> > serverPorts;
+
+      std::vector<std::vector<Ptr<OFSwitch13Port> > > ports;
+
+      ports.push_back (hostsSWAports);
+      ports.push_back (hostsSWBports);
+      ports.push_back (serverPorts);
+
+      switchPorts.push_back (ports);
+
+      NetDeviceContainer hostDevicesSWA;
+      NetDeviceContainer hostDevicesSWB;
+      NetDeviceContainer serversDevices;
+
+      //Configuring CSMA links of the hostsSWA
+      for (size_t j = 0; j < sliceNodes[currSlice][HOSTS_SWA].GetN (); j++)
+        {
+          pairDevs = csmaHelperEndPoints.Install (sliceNodes[currSlice][HOSTS_SWA].Get (j), switches.Get (0));
+          hostDevicesSWA.Add (pairDevs.Get (0));
+          switchPorts[currSlice][HOSTS_SWA].push_back (switchDevices.Get (0)->AddSwitchPort (pairDevs.Get (1)));
+        }
+
+      //Configuring CSMA links of the hostsSWB
+      for (size_t j = 0; j < sliceNodes[currSlice][HOSTS_SWB].GetN (); j++)
+        {
+          pairDevs = csmaHelperEndPoints.Install (sliceNodes[currSlice][HOSTS_SWB].Get (j), switches.Get (1));
+          hostDevicesSWB.Add (pairDevs.Get (0));
+          switchPorts[currSlice][HOSTS_SWB].push_back (switchDevices.Get (1)->AddSwitchPort (pairDevs.Get (1)));
+        }
+
+      //Configuring CSMA links of the servers
+      for (size_t j = 0; j < sliceNodes[currSlice][SERVERS].GetN (); j++)
+        {
+          pairDevs = csmaHelperEndPoints.Install (sliceNodes[currSlice][SERVERS].Get (j), switches.Get (2));
+          serversDevices.Add (pairDevs.Get (0));
+          switchPorts[currSlice][SERVERS].push_back (switchDevices.Get (2)->AddSwitchPort (pairDevs.Get (1)));
+        }
+
+      std::vector<NetDeviceContainer> devices;
+
+      devices.push_back (hostDevicesSWA);
+      devices.push_back (hostDevicesSWB);
+      devices.push_back (serversDevices);
+
+      sliceNetDevices.push_back (devices);
+
+      //Install the TCP/IP stack into hosts nodes (All hosts of all slices)
+      internet.Install (sliceNodes[currSlice][HOSTS_SWA]); //HostsSWA
+      internet.Install (sliceNodes[currSlice][HOSTS_SWB]); //HostsSWB
+      internet.Install (sliceNodes[currSlice][SERVERS]); //Servers
+
+      //Set IPv4 host addresses
+      Ipv4InterfaceContainer hostIpIfacesSWA;
+      Ipv4InterfaceContainer hostIpIfacesSWB;
+      Ipv4InterfaceContainer serversIpIfaces;
+
+      std::string baseAddressTmp = baseAddressStr;
+
+      //Number to identify if the address is given to a host or a server
+      int hostServer = 1;
+
+      std::string slice_id = std::to_string (currSlice);
+      std::string hostServer_str = std::to_string (hostServer);
+
+      boost::replace_all (baseAddressTmp, "x", slice_id);
+      boost::replace_all (baseAddressTmp, "y", hostServer_str);
+
+      baseAddress.Set (baseAddressTmp.c_str ());
+      ipv4helpr.SetBase ("10.0.0.0", "255.0.0.0", baseAddress);
+      hostIpIfacesSWA = ipv4helpr.Assign (sliceNetDevices[currSlice][HOSTS_SWA]); //hostDevicesSWA
+      hostIpIfacesSWB = ipv4helpr.Assign (sliceNetDevices[currSlice][HOSTS_SWB]); //hostDevicesSWB
 
 
-    baseAddress.Set (baseAddressTmp.c_str ());
-    ipv4helpr.SetBase ("10.0.0.0", "255.0.0.0", baseAddress);
-    serversIpIfaces = ipv4helpr.Assign (sliceNetDevices[currSlice][SERVERS]); //serversDevices
+      baseAddressTmp = baseAddressStr;
+      hostServer = hostServer + 1;
+      hostServer_str = std::to_string (hostServer);
+      boost::replace_all (baseAddressTmp, "x", slice_id);
+      boost::replace_all (baseAddressTmp, "y", hostServer_str);
 
-    Ipv4InterfaceContainer allHostsIpIfaces;
-    allHostsIpIfaces.Add (hostIpIfacesSWA);
-    allHostsIpIfaces.Add (hostIpIfacesSWB);
 
-    std::vector<Ipv4InterfaceContainer> interfaces;
+      baseAddress.Set (baseAddressTmp.c_str ());
+      ipv4helpr.SetBase ("10.0.0.0", "255.0.0.0", baseAddress);
+      serversIpIfaces = ipv4helpr.Assign (sliceNetDevices[currSlice][SERVERS]); //serversDevices
 
-    interfaces.push_back (hostIpIfacesSWA);
-    interfaces.push_back (hostIpIfacesSWB);
-    interfaces.push_back (serversIpIfaces);
-    interfaces.push_back (allHostsIpIfaces);
+      Ipv4InterfaceContainer allHostsIpIfaces;
+      allHostsIpIfaces.Add (hostIpIfacesSWA);
+      allHostsIpIfaces.Add (hostIpIfacesSWB);
 
-    sliceInterfaces.push_back (interfaces);
+      std::vector<Ipv4InterfaceContainer> interfaces;
 
-    numberSlices++;
-  }
+      interfaces.push_back (hostIpIfacesSWA);
+      interfaces.push_back (hostIpIfacesSWB);
+      interfaces.push_back (serversIpIfaces);
+      interfaces.push_back (allHostsIpIfaces);
+
+      sliceInterfaces.push_back (interfaces);
+
+      numberSlices++;
+    }
 
   std::stable_sort (slices.begin (), slices.end (), PriComp);
 
-  for(std::vector<Ptr<SliceInfo>>::iterator it = slices.begin(); it != slices.end(); ++it){
-    std::cout << "SliceId = " << (*it)->GetSliceId() << "| ";
-    std::cout << "Prio = " << (*it)->GetPriority() << "| ";
-    std::cout << "Quota = " << (*it)->GetQuota() << "| ";
-    std::cout << "HostsSWA = " << (*it)->GetHostsA() << "| ";
-    std::cout << "HostsSWB = " << (*it)->GetHostsB() << std::endl;
-  }
+  for (std::vector<Ptr<SliceInfo> >::iterator it = slices.begin (); it != slices.end (); ++it)
+    {
+      std::cout << "SliceId = " << (*it)->GetSliceId () << "| ";
+      std::cout << "Prio = " << (*it)->GetPriority () << "| ";
+      std::cout << "Quota = " << (*it)->GetQuota () << "| ";
+      std::cout << "HostsSWA = " << (*it)->GetHostsA () << "| ";
+      std::cout << "HostsSWB = " << (*it)->GetHostsB () << std::endl;
+    }
 
-  file.close();
+  file.close ();
 
 }
 
@@ -631,12 +634,13 @@ configureSwitches ()
   interSwitchesPorts.push_back (switchDevices.Get (1)->AddSwitchPort (pairDevs.Get (1)));
 
   //Tracing
-  if(trace){
+  if (trace)
+    {
 
-    csmaHelperinterSwitchesPorts.EnablePcap ("SWA", pairDevs.Get (0), true);
-    csmaHelperinterSwitchesPorts.EnablePcap ("SWB-LEFT", pairDevs.Get (1), true);
+      csmaHelperinterSwitchesPorts.EnablePcap ("SWA", pairDevs.Get (0), true);
+      csmaHelperinterSwitchesPorts.EnablePcap ("SWB-LEFT", pairDevs.Get (1), true);
 
-  }
+    }
 
   //Creating the LinkInfo object between SWA - SWB
   Ptr<CsmaChannel> channelSwaSwb = DynamicCast<CsmaChannel> (pairDevs.Get (0)->GetChannel ());
@@ -657,12 +661,13 @@ configureSwitches ()
   of13Helper->CreateOpenFlowChannels ();
 
   //Tracing
-  if(trace){
+  if (trace)
+    {
 
-    csmaHelperinterSwitchesPorts.EnablePcap ("SWB-RIGHT", pairDevs.Get (0), true);
-    csmaHelperinterSwitchesPorts.EnablePcap ("SERVERSW", pairDevs.Get (1), true);
+      csmaHelperinterSwitchesPorts.EnablePcap ("SWB-RIGHT", pairDevs.Get (0), true);
+      csmaHelperinterSwitchesPorts.EnablePcap ("SERVERSW", pairDevs.Get (1), true);
 
-  }
+    }
 
 }
 

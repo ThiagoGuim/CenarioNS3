@@ -115,7 +115,7 @@ Dscp2QueueMap ()
 QosType
 Dscp2QosType (Ipv4Header::DscpType dscp)
 {
-switch (dscp)
+  switch (dscp)
     {
     case Ipv4Header::DSCP_EF:
     case Ipv4Header::DSCP_AF41:

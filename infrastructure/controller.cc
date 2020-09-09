@@ -94,9 +94,6 @@ Controller::GetTypeId (void)
   return tid;
 }
 
-
-
-
 void
 Controller::NotifyClientsServers (TopologyIfaces_t sliceInterfaces,
                                   TopologyPorts_t switchPorts)
@@ -188,11 +185,11 @@ Controller::NotifySwitches (PortsVector_t interSwitchesPorts,
 
 
 void
-Controller::ConfigureMeters (std::vector<Ptr<SliceInfo>> slices)
+Controller::ConfigureMeters (std::vector<Ptr<SliceInfo> > slices)
 {
 
 
-  for(std::vector<Ptr<SliceInfo>>::iterator it = slices.begin(); it != slices.end(); ++it)
+  for (std::vector<Ptr<SliceInfo> >::iterator it = slices.begin (); it != slices.end (); ++it)
     {
       // Install slicing meters in both link directions.
       for (int d = 0; d < N_LINK_DIRS; d++)
@@ -200,8 +197,8 @@ Controller::ConfigureMeters (std::vector<Ptr<SliceInfo>> slices)
           LinkInfo::LinkDir dir = static_cast<LinkInfo::LinkDir> (d);
 
           bool success = true;
-          success &= m_lInfoA->UpdateQuota (dir, (*it)->GetSliceId(), (*it)->GetQuota());
-          success &= m_lInfoB->UpdateQuota (dir, (*it)->GetSliceId(), (*it)->GetQuota());
+          success &= m_lInfoA->UpdateQuota (dir, (*it)->GetSliceId (), (*it)->GetQuota ());
+          success &= m_lInfoB->UpdateQuota (dir, (*it)->GetSliceId (), (*it)->GetQuota ());
           NS_ASSERT_MSG (success, "Error when setting slice quotas.");
 
         }
