@@ -49,9 +49,9 @@ typedef enum
 
 // ----------------------------------------------------------------------------
 // Pipeline tables at OpenFlow switches.
-#define ROUTING_TAB 0
-#define METER_TAB 1
-#define QOS_TAB 2
+#define OFS_TAB_ROUTE 0
+#define OFS_TAB_METER 1
+#define OFS_TAB_QUEUE 2
 
 // Protocol numbers.
 #define IPV4_PROT_NUM (static_cast<uint16_t> (Ipv4L3Protocol::PROT_NUMBER))

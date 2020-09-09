@@ -183,7 +183,7 @@ Controller::HandshakeSuccessful (
     {
       std::ostringstream cmd;
       cmd << "flow-mod cmd=add,prio=32"
-          << ",table="        << QOS_TAB
+          << ",table="        << OFS_TAB_QUEUE
           << ",flags="        << FLAGS_REMOVED_OVERLAP_RESET
           << " eth_type="     << IPV4_PROT_NUM
           << ",ip_dscp="      << static_cast<uint16_t> (it.first)
@@ -563,7 +563,7 @@ Controller::SlicingMeterApply (Ptr<LinkInfo> lInfo, int sliceId)
   std::ostringstream cmd;
   cmd << "flow-mod cmd=add"
       << ",prio="       << (sliceId == SLICE_ALL ? 32 : 64)
-      << ",table="      << METER_TAB
+      << ",table="      << OFS_TAB_METER
       << ",flags="      << FLAGS_REMOVED_OVERLAP_RESET;
 
 
@@ -574,7 +574,7 @@ Controller::SlicingMeterApply (Ptr<LinkInfo> lInfo, int sliceId)
   mtc << " eth_type="   << IPV4_PROT_NUM
       << ",ip_dst=10." << sliceId << ".2.0/255.255.255.0"
       << " meter:" << meterId
-      << " goto:" << QOS_TAB;
+      << " goto:" << OFS_TAB_QUEUE;
 
   DpctlExecute (lInfo->GetSwDpId (static_cast<int> (LinkInfo::FWD)), cmd.str () + mtc.str ());
 
@@ -586,7 +586,7 @@ Controller::SlicingMeterApply (Ptr<LinkInfo> lInfo, int sliceId)
   mtc1 << " eth_type="   << IPV4_PROT_NUM
        << ",ip_dst=10." << sliceId << ".1.0/255.255.255.0"
        << " meter:" << meterId
-       << " goto:" << QOS_TAB;
+       << " goto:" << OFS_TAB_QUEUE;
   DpctlExecute (lInfo->GetSwDpId (static_cast<int> (LinkInfo::BWD)), cmd.str () + mtc1.str ());
 
 }
