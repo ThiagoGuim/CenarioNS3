@@ -104,6 +104,23 @@ OpModeStr (OpMode mode)
 }
 
 std::string
+QosTypeStr (QosType type)
+{
+  switch (type)
+    {
+    case QosType::NON:
+      return "NonGBR";
+    case QosType::GBR:
+      return "GBR";
+    case QosType::BOTH:
+      return "Both";
+    default:
+      NS_LOG_ERROR ("Invalid QoS traffic type.");
+      return std::string ();
+    }
+}
+
+std::string
 GetUint32Hex (uint32_t value)
 {
   char valueStr [11];

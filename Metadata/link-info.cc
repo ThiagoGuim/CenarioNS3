@@ -407,7 +407,7 @@ LinkInfo::NotifyTxPacket (std::string context, Ptr<const Packet> packet)
   if (packet->PeekPacketTag (tag))
     {
       uint8_t slice = tag.GetSliceId ();
-      QosType type = QosType::NON; // FIXME
+      QosType type = tag.GetQosType ();
       uint32_t size = packet->GetSize ();
 
       // Update TX packets.

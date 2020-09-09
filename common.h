@@ -20,10 +20,7 @@ typedef enum
 #define SLICE_UNKN    0
 #define SLICE_ALL     (N_MAX_SLICES + 1)
 
-/**
-\ingroup svelte
-* Enumeration of available LTE QoS traffic types.
-*/
+/** Enumeration of available QoS traffic types. */
 typedef enum
 {
   // Don't change the order. Enum values are used as array indexes.
@@ -33,36 +30,22 @@ typedef enum
 } QosType;
 
 // Total number of valid QosType items.
-  #define N_QOS_TYPES (static_cast<int> (QosType::BOTH))
-  #define N_QOS_TYPES_BOTH (static_cast<int> (QosType::BOTH) + 1)
-
-/**
-* \ingroup svelte
-* Enumeration of available traffic directions.
-*/
-typedef enum
-{
-  // Don't change the order. Enum values are used as array indexes.
-  DLINK = 0,    //!< Downlink traffic.
-  ULINK = 1     //!< Uplink traffic.
-} Direction;
+#define N_QOS_TYPES (static_cast<int> (QosType::BOTH))
+#define N_QOS_TYPES_BOTH (static_cast<int> (QosType::BOTH) + 1)
 
 // Pipeline tables at OpenFlow Switches.
-  #define ROUTING_TAB 0
-  #define METER_TAB 1
-  #define QOS_TAB 2
+#define ROUTING_TAB 0
+#define METER_TAB 1
+#define QOS_TAB 2
 
 // Protocol numbers.
-  #define IPV4_PROT_NUM (static_cast<uint16_t> (Ipv4L3Protocol::PROT_NUMBER))
+#define IPV4_PROT_NUM (static_cast<uint16_t> (Ipv4L3Protocol::PROT_NUMBER))
 
 // OpenFlow flow-mod flags.
-  #define FLAGS_REMOVED_OVERLAP_RESET ((OFPFF_SEND_FLOW_REM | OFPFF_CHECK_OVERLAP | OFPFF_RESET_COUNTS))
-  #define FLAGS_OVERLAP_RESET ((OFPFF_CHECK_OVERLAP | OFPFF_RESET_COUNTS))
+#define FLAGS_REMOVED_OVERLAP_RESET ((OFPFF_SEND_FLOW_REM | OFPFF_CHECK_OVERLAP | OFPFF_RESET_COUNTS))
+#define FLAGS_OVERLAP_RESET ((OFPFF_CHECK_OVERLAP | OFPFF_RESET_COUNTS))
 
-/**
- * \ingroup svelte
- * Enumeration of available inter-slicing operation modes.
- */
+/** Enumeration of available inter-slicing operation modes. */
 typedef enum
 {
   NONE = 0,     //!< No inter-slicing.
@@ -72,12 +55,9 @@ typedef enum
 } SliceMode;
 
 // Total number of valid SliceMode items.
-  #define N_SLICE_MODES (static_cast<int> (SliceMode::DYNA) + 1)
+#define N_SLICE_MODES (static_cast<int> (SliceMode::DYNA) + 1)
 
-/**
- * \ingroup svelte
- * Enumeration of available operation modes.
- */
+/** Enumeration of available operation modes. */
 typedef enum
 {
   OFF  = 0,     //!< Always off.
@@ -86,99 +66,87 @@ typedef enum
 } OpMode;
 
 // Total number of valid OpMode items.
-  #define N_OP_MODES (static_cast<int> (OpMode::AUTO) + 1)
-
+#define N_OP_MODES (static_cast<int> (OpMode::AUTO) + 1)
 
 /**
-* \ingroup svelte
-* Convert the BPS to KBPS without precision loss.
-* \param bitrate The bit rate in BPS.
-* \return The bitrate in KBPS.
-*/
+ * Convert the BPS to KBPS without precision loss.
+ * \param bitrate The bit rate in BPS.
+ * \return The bitrate in KBPS.
+ */
 double Bps2Kbps (int64_t bitrate);
-
 
 /** Map saving IP DSCP value / OpenFlow queue id. */
 typedef std::map<Ipv4Header::DscpType, uint32_t> DscpQueueMap_t;
 
 /**
-* \ingroup svelte
-* Get the mapped OpenFlow output queue ID for all DSCP used values.
-* \return The OpenFlow queue ID mapped values.
-*
-* \internal
-* Mapping the IP DSCP to the OpenFlow output queue ID.
-* \verbatim
-* DSCP_EF   --> OpenFlow queue 0 (priority)
-* DSCP_AF41 --> OpenFlow queue 1 (WRR)
-* DSCP_AF31 --> OpenFlow queue 1 (WRR)
-* DSCP_AF32 --> OpenFlow queue 1 (WRR)
-* DSCP_AF21 --> OpenFlow queue 1 (WRR)
-* DSCP_AF11 --> OpenFlow queue 1 (WRR)
-* DSCP_BE   --> OpenFlow queue 2 (WRR)
-* \endverbatim
-*/
+ * Get the mapped OpenFlow output queue ID for all DSCP used values.
+ * \return The OpenFlow queue ID mapped values.
+ *
+ * \internal
+ * Mapping the IP DSCP to the OpenFlow output queue ID.
+ * \verbatim
+ * DSCP_EF   --> OpenFlow queue 0 (priority)
+ * DSCP_AF41 --> OpenFlow queue 1 (WRR)
+ * DSCP_AF31 --> OpenFlow queue 1 (WRR)
+ * DSCP_AF32 --> OpenFlow queue 1 (WRR)
+ * DSCP_AF21 --> OpenFlow queue 1 (WRR)
+ * DSCP_AF11 --> OpenFlow queue 1 (WRR)
+ * DSCP_BE   --> OpenFlow queue 2 (WRR)
+ * \endverbatim
+ */
 const DscpQueueMap_t& Dscp2QueueMap (void);
 
-
 /**
-* \ingroup svelte
-* Compute the meter ID value globally used in the SVELTE architecture for
-* infrastructure slicing meters.
-* \param sliceId The SVELTE logical slice ID.
-* \param linkdir The link direction.
-* \return The meter ID value.
-*
-* \internal
-* We are using the following meter ID allocation strategy:
-* \verbatim
-* Meter ID has 32 bits length: 0x 0 0 00000 0
-*                                |-|-|-----|-|
-*                                 A B C     D
-*
-*  4 (A) bits are used to identify a slicing meter, here fixed at 0xC.
-*  4 (B) bits are used to identify the logical slice (slice ID).
-* 20 (C) bits are unused, here fixed at 0x00000.
-*  4 (D) bits are used to identify the link direction.
-* \endverbatim
-*/
+ * Compute the meter ID value globally used in the SVELTE architecture for
+ * infrastructure slicing meters.
+ * \param sliceId The SVELTE logical slice ID.
+ * \param linkdir The link direction.
+ * \return The meter ID value.
+ *
+ * \internal
+ * We are using the following meter ID allocation strategy:
+ * \verbatim
+ * Meter ID has 32 bits length: 0x 0 0 00000 0
+ *                                |-|-|-----|-|
+ *                                 A B C     D
+ *
+ *  4 (A) bits are used to identify a slicing meter, here fixed at 0xC.
+ *  4 (B) bits are used to identify the logical slice (slice ID).
+ * 20 (C) bits are unused, here fixed at 0x00000.
+ *  4 (D) bits are used to identify the link direction.
+ * \endverbatim
+ */
 uint32_t MeterIdSlcCreate (uint32_t sliceId, uint32_t linkdir);
 
 /**
-* \ingroup svelte
-* Get the slice ID name.
-* \param slice The slice ID.
-* \return The string with the slice ID name.
-*/
-//std::string SliceIdStr (int slice);
-
-/**
-* \ingroup svelte
-* Get the inter-slicing operation mode name.
-* \param mode The inter-slicing operation mode.
-* \return The string with the inter-slicing operation mode name.
-*/
+ * Get the inter-slicing operation mode name.
+ * \param mode The inter-slicing operation mode.
+ * \return The string with the inter-slicing operation mode name.
+ */
 std::string SliceModeStr (SliceMode mode);
 
-
 /**
-* \ingroup svelte
-* Get the operation mode name.
-* \param mode The operation mode.
-* \return The string with the operation mode name.
-*/
+ * Get the operation mode name.
+ * \param mode The operation mode.
+ * \return The string with the operation mode name.
+ */
 std::string OpModeStr (OpMode mode);
 
 /**
-* \ingroup svelte
-* Convert the uint32_t parameter value to a hexadecimal string representation.
-* \param value The uint32_t value.
-* \return The hexadecimal string representation.
-*/
+ * Get the LTE QoS traffic type name.
+ * \param type The LTE QoS traffic type.
+ * \return The string with the LTE QoS traffic type name.
+ */
+std::string QosTypeStr (QosType type);
+
+/**
+ * Convert the uint32_t parameter value to a hexadecimal string representation.
+ * \param value The uint32_t value.
+ * \return The hexadecimal string representation.
+ */
 std::string GetUint32Hex (uint32_t value);
 
 /**
- * \ingroup svelte
  * Get the mapped IP ToS value for a specific DSCP.
  * \param dscp The IP DSCP value.
  * \return The IP ToS mapped for this DSCP.

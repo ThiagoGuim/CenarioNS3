@@ -31,19 +31,18 @@ namespace ns3 {
 class Tag;
 
 /**
- * .
+ * Tag used for packets in the network.
  */
 class SliceTag : public Tag
 {
 public:
-  
-
   static TypeId GetTypeId (void);
   virtual TypeId GetInstanceTypeId (void) const;
 
   /** Constructors */
   SliceTag ();
-  SliceTag (uint8_t sliceId);
+  SliceTag (uint8_t slice);
+  SliceTag (uint8_t slice, QosType type);
 
   // Inherited from Tag
   virtual void Serialize (TagBuffer i) const;
@@ -56,17 +55,15 @@ public:
    * \return The requested information.
    */
   //\{
-  Time          GetTimestamp  (void) const;
-  uint8_t GetSliceId (void) const;
-  uint8_t GetType (void) const;
+  Time    GetTimestamp  (void) const;
+  uint8_t GetSliceId    (void) const;
+  QosType GetQosType    (void) const;
   //\}
 
 private:
-
-  uint8_t   m_slice;       //!< SliceId.
   uint64_t  m_time;        //!< Input timestamp.
-  uint8_t  m_type;        //!< GBR or NON-GBR.
-
+  uint8_t   m_slice;       //!< SliceId.
+  uint8_t   m_type;        //!< GBR or NON-GBR.
 };
 
 } // namespace ns3
