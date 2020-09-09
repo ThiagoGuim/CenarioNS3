@@ -172,6 +172,25 @@ typedef std::map<Ipv4Header::DscpType, uint32_t> DscpQueueMap_t;
 const DscpQueueMap_t& Dscp2QueueMap (void);
 
 /**
+ * Get the QoS type for a given DSCP value.
+ * \param dscp The DSCP type value.
+ * \return The QoS type.
+ *
+ * \internal
+ * Mapping the IP DSCP to the QosType.
+ * \verbatim
+ * DSCP_EF   --> GBR
+ * DSCP_AF41 --> GBR
+ * DSCP_AF31 --> Non-GBR
+ * DSCP_AF32 --> Non-GBR
+ * DSCP_AF21 --> Non-GBR
+ * DSCP_AF11 --> Non-GBR
+ * DSCP_BE   --> Non-GBR
+ * \endverbatim
+ */
+QosType Dscp2QosType (Ipv4Header::DscpType dscp);
+
+/**
  * Get the DSCP type name.
  * \param dscp The DSCP type value.
  * \return The string with the DSCP type name.

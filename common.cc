@@ -112,6 +112,25 @@ Dscp2QueueMap ()
   return queueByDscp;
 }
 
+QosType
+Dscp2QosType (Ipv4Header::DscpType dscp)
+{
+switch (dscp)
+    {
+    case Ipv4Header::DSCP_EF:
+    case Ipv4Header::DSCP_AF41:
+      return QosType::GBR;
+    case Ipv4Header::DSCP_AF32:
+    case Ipv4Header::DSCP_AF31:
+    case Ipv4Header::DSCP_AF21:
+    case Ipv4Header::DSCP_AF11:
+    case Ipv4Header::DscpDefault:
+      return QosType::NON;
+    default:
+      NS_ABORT_MSG ("No QoS type mapped value for DSCP " << dscp);
+    }
+}
+
 std::string
 DscpTypeStr (Ipv4Header::DscpType dscp)
 {
