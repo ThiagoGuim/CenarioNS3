@@ -87,6 +87,9 @@ protected:
   /** Destructor implementation. */
   virtual void DoDispose ();
 
+  // Inherited from ObjectBase.
+  void NotifyConstructionCompleted (void);
+
 private:
   /**
    * Register the slice information in global map for further usage.

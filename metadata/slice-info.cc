@@ -32,11 +32,6 @@ SliceInfo::SliceInfoMap_t SliceInfo::m_sliceInfoById;
 SliceInfoList_t SliceInfo::m_sliceInfoList;
 
 SliceInfo::SliceInfo ()
-  : m_sliceId (0),
-  m_prio (0),
-  m_quota (0),
-  m_hostsA (0),
-  m_hostsB (0)
 {
   NS_LOG_FUNCTION (this);
 }
@@ -53,9 +48,10 @@ SliceInfo::GetTypeId (void)
     .SetParent<Object> ()
     .AddConstructor<SliceInfo> ()
     .AddAttribute ("SliceId", "Slice identifier.",
+                   TypeId::ATTR_GET | TypeId::ATTR_CONSTRUCT,
                    UintegerValue (0),
                    MakeUintegerAccessor (&SliceInfo::m_sliceId),
-                   MakeUintegerChecker<uint16_t> (SLICE_UNKN, N_MAX_SLICES))
+                   MakeUintegerChecker<uint16_t> (1, N_MAX_SLICES))
     .AddAttribute ("Priority", "Slice priority.",
                    UintegerValue (0),
                    MakeUintegerAccessor (&SliceInfo::m_prio),
@@ -65,10 +61,12 @@ SliceInfo::GetTypeId (void)
                    MakeUintegerAccessor (&SliceInfo::m_quota),
                    MakeUintegerChecker<uint16_t> (0, 100))
     .AddAttribute ("HostsA", "Number of hosts attached to switch A.",
+                   TypeId::ATTR_GET | TypeId::ATTR_CONSTRUCT,
                    UintegerValue (0),
                    MakeUintegerAccessor (&SliceInfo::m_hostsA),
                    MakeUintegerChecker<uint16_t> (0, 255))
     .AddAttribute ("HostsB", "Number of hosts attached to switch B.",
+                   TypeId::ATTR_GET | TypeId::ATTR_CONSTRUCT,
                    UintegerValue (0),
                    MakeUintegerAccessor (&SliceInfo::m_hostsB),
                    MakeUintegerChecker<uint16_t> (0, 255))
@@ -150,6 +148,15 @@ void
 SliceInfo::DoDispose ()
 {
   Object::DoDispose ();
+}
+
+void
+SliceInfo::NotifyConstructionCompleted (void)
+{
+  NS_LOG_FUNCTION (this);
+
+  RegisterSliceInfo (Ptr<SliceInfo> (this));
+  Object::NotifyConstructionCompleted ();
 }
 
 const SliceInfoList_t&
