@@ -70,10 +70,12 @@ public:
    * \param node2nd The container of nodes to install the second app.
    * \param addr1st The container of IPv4 addresses of the first node.
    * \param addr2nd The container of IPv4 addresses of the second node.
+   * \param dscp The DSCP value used to set the socket Type of Service field.
    */
   void Install (
     NodeContainer nodes1st, NodeContainer nodes2nd,
-    Ipv4InterfaceContainer addr1st, Ipv4InterfaceContainer addr2nd);
+    Ipv4InterfaceContainer addr1st, Ipv4InterfaceContainer addr2nd,
+    Ipv4Header::DscpType dscp = Ipv4Header::DscpDefault);
 
   /**
    * Create a pair of peer applications on input nodes.

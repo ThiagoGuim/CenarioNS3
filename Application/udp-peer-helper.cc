@@ -89,7 +89,8 @@ UdpPeerHelper::SetBothAttribute (std::string name, const AttributeValue &value)
 void
 UdpPeerHelper::Install (
   NodeContainer nodes1st, NodeContainer nodes2nd,
-  Ipv4InterfaceContainer addr1st, Ipv4InterfaceContainer addr2nd)
+  Ipv4InterfaceContainer addr1st, Ipv4InterfaceContainer addr2nd,
+  Ipv4Header::DscpType dscp)
 {
   NS_ASSERT_MSG (nodes1st.GetN () == nodes2nd.GetN ()
                  && addr1st.GetN () == addr2nd.GetN ()
@@ -105,7 +106,7 @@ UdpPeerHelper::Install (
           m_startTime += Seconds (std::abs (m_startRng->GetValue ()));
           InstallApp (nodes1st.Get (i), nodes2nd.Get (i),
                       addr1st.GetAddress (i), addr2nd.GetAddress (i),
-                      GetNextPortNo (), Ipv4Header::DscpDefault, m_startTime);
+                      GetNextPortNo (), dscp, m_startTime);
           NS_LOG_INFO ("App " << j << " at node " << i <<
                        " will start at " << m_startTime.GetSeconds ());
         }
@@ -130,12 +131,14 @@ UdpPeerHelper::InstallApp (
   inetAddr2nd.SetTos (ipTos);
   app1st->SetAttribute ("LocalPort", UintegerValue (portNo));
   app1st->SetAttribute ("PeerAddress", AddressValue (inetAddr2nd));
+  app1st->SetAttribute ("QosType", EnumValue (Dscp2QosType (dscp)));
   node1st->AddApplication (app1st);
 
   InetSocketAddress inetAddr1st (addr1st, portNo);
   inetAddr1st.SetTos (ipTos);
   app2nd->SetAttribute ("LocalPort", UintegerValue (portNo));
   app2nd->SetAttribute ("PeerAddress", AddressValue (inetAddr1st));
+  app2nd->SetAttribute ("QosType", EnumValue (Dscp2QosType (dscp)));
   node2nd->AddApplication (app2nd);
 
   Simulator::Schedule (startTime, &UdpPeerApp::StartTraffic, app1st);
