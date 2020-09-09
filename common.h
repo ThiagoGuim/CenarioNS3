@@ -1,11 +1,32 @@
-#ifndef SVELTE_COMMON_H
-#define SVELTE_COMMON_H
+/* -*-  Mode: C++; c-file-style: "gnu"; indent-tabs-mode:nil; -*- */
+/*
+ * Copyright (c) 2020 Federal University of Juiz de Fora (UFJF)
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 as
+ * published by the Free Software Foundation;
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program; if not, write to the Free Software
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ *
+ * Author: Thiago Guimarães <thiago.guimaraes@ice.ufjf.br>
+ */
+
+#ifndef COMMON_H
+#define COMMON_H
 
 #include <ns3/internet-module.h>
 #include <ns3/core-module.h>
 
 namespace ns3 {
 
+// ----------------------------------------------------------------------------
 /** Constants that represent the indexes in the vectors. */
 typedef enum
 {
@@ -14,12 +35,37 @@ typedef enum
   SERVERS   = 2,    //!< The servers inside de vectors.
   ALL_HOSTS = 3     //!< All the hosts (SWA+SWB) inside de vectors.
 } Indexes;
+// ----------------------------------------------------------------------------
 
+
+// ----------------------------------------------------------------------------
 // Valid number of slices and IDs
-#define N_MAX_SLICES  14    //!< Slice IDs ranging from 1 to 14
+#define N_MAX_SLICES  14    //!< Slice IDs ranging from 1 to 14. Don't change!
 #define SLICE_UNKN    0
 #define SLICE_ALL     (N_MAX_SLICES + 1)
+// ----------------------------------------------------------------------------
 
+
+// ----------------------------------------------------------------------------
+// Pipeline tables at OpenFlow switches.
+#define ROUTING_TAB 0
+#define METER_TAB 1
+#define QOS_TAB 2
+
+// Protocol numbers.
+#define IPV4_PROT_NUM (static_cast<uint16_t> (Ipv4L3Protocol::PROT_NUMBER))
+#define UDP_PROT_NUM  (static_cast<uint16_t> (UdpL4Protocol::PROT_NUMBER))
+#define TCP_PROT_NUM  (static_cast<uint16_t> (TcpL4Protocol::PROT_NUMBER))
+
+// OpenFlow flow-mod flags.
+#define FLAGS_REMOVED_OVERLAP_RESET \
+  ((OFPFF_SEND_FLOW_REM | OFPFF_CHECK_OVERLAP | OFPFF_RESET_COUNTS))
+#define FLAGS_OVERLAP_RESET \
+  ((OFPFF_CHECK_OVERLAP | OFPFF_RESET_COUNTS))
+// ----------------------------------------------------------------------------
+
+
+// ----------------------------------------------------------------------------
 /** Enumeration of available QoS traffic types. */
 typedef enum
 {
@@ -33,18 +79,16 @@ typedef enum
 #define N_QOS_TYPES (static_cast<int> (QosType::BOTH))
 #define N_QOS_TYPES_BOTH (static_cast<int> (QosType::BOTH) + 1)
 
-// Pipeline tables at OpenFlow Switches.
-#define ROUTING_TAB 0
-#define METER_TAB 1
-#define QOS_TAB 2
+/**
+ * Get the LTE QoS traffic type name.
+ * \param type The LTE QoS traffic type.
+ * \return The string with the LTE QoS traffic type name.
+ */
+std::string QosTypeStr (QosType type);
+// ----------------------------------------------------------------------------
 
-// Protocol numbers.
-#define IPV4_PROT_NUM (static_cast<uint16_t> (Ipv4L3Protocol::PROT_NUMBER))
 
-// OpenFlow flow-mod flags.
-#define FLAGS_REMOVED_OVERLAP_RESET ((OFPFF_SEND_FLOW_REM | OFPFF_CHECK_OVERLAP | OFPFF_RESET_COUNTS))
-#define FLAGS_OVERLAP_RESET ((OFPFF_CHECK_OVERLAP | OFPFF_RESET_COUNTS))
-
+// ----------------------------------------------------------------------------
 /** Enumeration of available inter-slicing operation modes. */
 typedef enum
 {
@@ -57,6 +101,16 @@ typedef enum
 // Total number of valid SliceMode items.
 #define N_SLICE_MODES (static_cast<int> (SliceMode::DYNA) + 1)
 
+/**
+ * Get the inter-slicing operation mode name.
+ * \param mode The inter-slicing operation mode.
+ * \return The string with the inter-slicing operation mode name.
+ */
+std::string SliceModeStr (SliceMode mode);
+// ----------------------------------------------------------------------------
+
+
+// ----------------------------------------------------------------------------
 /** Enumeration of available operation modes. */
 typedef enum
 {
@@ -69,12 +123,32 @@ typedef enum
 #define N_OP_MODES (static_cast<int> (OpMode::AUTO) + 1)
 
 /**
+ * Get the operation mode name.
+ * \param mode The operation mode.
+ * \return The string with the operation mode name.
+ */
+std::string OpModeStr (OpMode mode);
+// ----------------------------------------------------------------------------
+
+
+// ----------------------------------------------------------------------------
+/**
  * Convert the BPS to KBPS without precision loss.
  * \param bitrate The bit rate in BPS.
  * \return The bitrate in KBPS.
  */
 double Bps2Kbps (int64_t bitrate);
 
+/**
+ * Convert DataRate BPS to KBPS without precision loss.
+ * \param bitrate The DataRate.
+ * \return The bitrate in KBPS.
+ */
+double Bps2Kbps (DataRate datarate);
+// ----------------------------------------------------------------------------
+
+
+// ----------------------------------------------------------------------------
 /** Map saving IP DSCP value / OpenFlow queue id. */
 typedef std::map<Ipv4Header::DscpType, uint32_t> DscpQueueMap_t;
 
@@ -97,48 +171,38 @@ typedef std::map<Ipv4Header::DscpType, uint32_t> DscpQueueMap_t;
 const DscpQueueMap_t& Dscp2QueueMap (void);
 
 /**
- * Compute the meter ID value globally used in the SVELTE architecture for
- * infrastructure slicing meters.
- * \param sliceId The SVELTE logical slice ID.
+ * Get the DSCP type name.
+ * \param dscp The DSCP type value.
+ * \return The string with the DSCP type name.
+ */
+std::string DscpTypeStr (Ipv4Header::DscpType dscp);
+// ----------------------------------------------------------------------------
+
+
+// ----------------------------------------------------------------------------
+/**
+ * Compute the meter ID value globally used for slicing meters.
+ * \param sliceId The slice ID.
  * \param linkdir The link direction.
  * \return The meter ID value.
  *
  * \internal
  * We are using the following meter ID allocation strategy:
  * \verbatim
- * Meter ID has 32 bits length: 0x 0 0 00000 0
- *                                |-|-|-----|-|
- *                                 A B C     D
+ * Meter ID has 32 bits length: 0x 000000 0 0
+ *                                |------|-|-|
+ *                                   A    B C
  *
- *  4 (A) bits are used to identify a slicing meter, here fixed at 0xC.
- *  4 (B) bits are used to identify the logical slice (slice ID).
- * 20 (C) bits are unused, here fixed at 0x00000.
- *  4 (D) bits are used to identify the link direction.
+ *  24 (A) bits are used to identify a slicing meter, here fixed at 0x800000.
+ *   4 (B) bits are used to identify the slice ID.
+ *   4 (C) bits are used to identify the link direction.
  * \endverbatim
  */
 uint32_t MeterIdSlcCreate (uint32_t sliceId, uint32_t linkdir);
+// ----------------------------------------------------------------------------
 
-/**
- * Get the inter-slicing operation mode name.
- * \param mode The inter-slicing operation mode.
- * \return The string with the inter-slicing operation mode name.
- */
-std::string SliceModeStr (SliceMode mode);
 
-/**
- * Get the operation mode name.
- * \param mode The operation mode.
- * \return The string with the operation mode name.
- */
-std::string OpModeStr (OpMode mode);
-
-/**
- * Get the LTE QoS traffic type name.
- * \param type The LTE QoS traffic type.
- * \return The string with the LTE QoS traffic type name.
- */
-std::string QosTypeStr (QosType type);
-
+// ----------------------------------------------------------------------------
 /**
  * Convert the uint32_t parameter value to a hexadecimal string representation.
  * \param value The uint32_t value.
@@ -147,28 +211,12 @@ std::string QosTypeStr (QosType type);
 std::string GetUint32Hex (uint32_t value);
 
 /**
- * Get the mapped IP ToS value for a specific DSCP.
- * \param dscp The IP DSCP value.
- * \return The IP ToS mapped for this DSCP.
- *
- * \internal
- * We are mapping the DSCP value (RFC 2474) to the IP Type of Service (ToS)
- * (RFC 1349) field because the pfifo_fast queue discipline from the traffic
- * control module still uses the old IP ToS definition. Thus, we are
- * 'translating' the DSCP values so we can keep the queuing consistency
- * both on traffic control module and OpenFlow port queues.
- * \verbatim
- * DSCP_EF   --> ToS 0x10 --> prio 6 --> pfifo band 0
- * DSCP_AF41 --> ToS 0x18 --> prio 4 --> pfifo band 1
- * DSCP_AF31 --> ToS 0x00 --> prio 0 --> pfifo band 1
- * DSCP_AF32 --> ToS 0x00 --> prio 0 --> pfifo band 1
- * DSCP_AF21 --> ToS 0x00 --> prio 0 --> pfifo band 1
- * DSCP_AF11 --> ToS 0x00 --> prio 0 --> pfifo band 1
- * DSCP_BE   --> ToS 0x08 --> prio 2 --> pfifo band 2
- * \endverbatim
- * \see See the ns3::Socket::IpTos2Priority for details.
+ * Convert the uint64_t parameter value to a hexadecimal string representation.
+ * \param value The uint64_t value.
+ * \return The hexadecimal string representation.
  */
-uint8_t Dscp2Tos (Ipv4Header::DscpType dscp);
+std::string GetUint64Hex (uint64_t value);
+// ----------------------------------------------------------------------------
 
 } // namespace ns3
 #endif // COMMON_H
