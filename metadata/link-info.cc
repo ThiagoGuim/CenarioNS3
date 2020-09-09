@@ -555,7 +555,7 @@ LinkInfo::RegisterLinkInfo (Ptr<LinkInfo> lInfo)
   key.first  = std::min (dpId1, dpId2);
   key.second = std::max (dpId1, dpId2);
 
-  std::pair<DpIdPair_t, Ptr<LinkInfo> > entry (key, lInfo);
+  std::pair<DpIdPair_t, Ptr<LinkInfo>> entry (key, lInfo);
   std::pair<LinkInfoMap_t::iterator, bool> ret;
   ret = LinkInfo::m_linkInfoByDpIds.insert (entry);
   NS_ABORT_MSG_IF (ret.second == false, "Existing connection information.");

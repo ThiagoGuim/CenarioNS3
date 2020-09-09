@@ -181,7 +181,7 @@ void
 SliceInfo::RegisterSliceInfo (Ptr<SliceInfo> sInfo)
 {
   uint16_t key = sInfo->GetSliceId ();
-  std::pair<uint16_t, Ptr<SliceInfo> > entry (key, sInfo);
+  std::pair<uint16_t, Ptr<SliceInfo>> entry (key, sInfo);
   auto ret = SliceInfo::m_sliceInfoById.insert (entry);
   NS_ABORT_MSG_IF (ret.second == false, "Existing slice info for this key");
 

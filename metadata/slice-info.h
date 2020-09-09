@@ -29,7 +29,7 @@ namespace ns3 {
 class SliceInfo;
 
 /** A list of slice information objects. */
-typedef std::vector<Ptr<SliceInfo> > SliceInfoList_t;
+typedef std::vector<Ptr<SliceInfo>> SliceInfoList_t;
 
 /**
  * Class for slice metadata.
@@ -106,7 +106,7 @@ private:
   /**
    * Map saving slice ID / slice information.
    */
-  typedef std::map<uint16_t, Ptr<SliceInfo> > SliceInfoMap_t;
+  typedef std::map<uint16_t, Ptr<SliceInfo>> SliceInfoMap_t;
   static SliceInfoMap_t  m_sliceInfoById;   //!< Global slice info map.
   static SliceInfoList_t m_sliceInfoList;   //!< Global list of slice info.
 };
