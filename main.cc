@@ -32,9 +32,9 @@
 #include <boost/algorithm/string/replace.hpp>
 #include <string>
 #include <fstream>
-#include "Infrastructure/controller.h"
-#include "Application/udp-peer-helper.h"
-#include "Metadata/slice.h"
+#include "infrastructure/controller.h"
+#include "application/udp-peer-helper.h"
+#include "metadata/slice.h"
 
 
 using namespace ns3;
@@ -186,7 +186,7 @@ main (int argc, char *argv[])
 
     }
 
-  //Configure the Application
+  //Configure the application
   for (size_t i = 0; i < numberSlices; i++)
     {
       Ptr<ExponentialRandomVariable> startRng = CreateObject<ExponentialRandomVariable> ();

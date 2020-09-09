@@ -26,9 +26,9 @@
 #include <ns3/internet-module.h>
 #include <ns3/ofswitch13-module.h>
 
-#include "../Metadata/link-info.h"
-#include "../Infrastructure/qos-queue.h"
-#include "../Metadata/slice.h"
+#include "../metadata/link-info.h"
+#include "../infrastructure/qos-queue.h"
+#include "../metadata/slice.h"
 
 namespace ns3 {
 
