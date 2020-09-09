@@ -34,9 +34,9 @@ namespace ns3 {
 
 class LinkInfo;
 
-typedef std::vector<Ptr<OFSwitch13Port> > PortsVector_t;
-typedef std::vector<std::vector<PortsVector_t> > TopologyPorts_t;
-typedef std::vector<std::vector<Ipv4InterfaceContainer> > TopologyIfaces_t;
+
+typedef std::vector<std::vector<PortsList_t>> TopologyPorts_t;
+typedef std::vector<std::vector<Ipv4InterfaceContainer>> TopologyIfaces_t;
 
 /**
  * \ingroup ofswitch13
@@ -73,7 +73,7 @@ public:
    * \param switchDevices Container responsible to store de Devices of each switch.
    * \return void.
    */
-  void NotifySwitches (PortsVector_t interSwitchesPorts,
+  void NotifySwitches (PortsList_t interSwitchesPorts,
                        OFSwitch13DeviceContainer switchDevices);
 
   /**
@@ -82,7 +82,7 @@ public:
    * \param sliceQuotas Vector that contains the slice quotas.
    * \return void.
    */
-  void ConfigureMeters (std::vector<Ptr<SliceInfo> > slices);
+  void ConfigureMeters (std::vector<Ptr<SliceInfo>> slices);
 
 protected:
   /** Destructor implementation */

@@ -72,28 +72,25 @@ static ns3::GlobalValue
              ns3::BooleanValue (false),
              ns3::MakeBooleanChecker ());
 
-void ForceDefaults    (void);
-void EnableProgress   (int);
-void EnableVerbose    (bool);
-void EnableOfsLogs    (bool);
-void CreateAnimation  (bool);
+void ForceDefaults      (void);
+void EnableProgress     (int);
+void EnableVerbose      (bool);
+void EnableOfsLogs      (bool);
+void CreateAnimation    (bool);
+void SliceFactoryParse  (std::string, ObjectFactory&);
 
-typedef std::vector<std::vector<NodeContainer> > TopologyNodes_t;
-typedef std::vector<std::vector<NetDeviceContainer> > TopologyNetDevices_t;
+typedef std::vector<std::vector<NodeContainer>> TopologyNodes_t;
+typedef std::vector<std::vector<NetDeviceContainer>> TopologyNetDevices_t;
 
 //Set animation configurations
 
 //Nodes and CSMA links configuration
-void configureSwitches ();
+
 void configureSlices (std::string config);
-
-//Auxiliar function to parse the string passed by the command line file and get the slice attributes
-void parse (std::string v, ObjectFactory &factory);
-
 
 
 //Variables storing the topology config
-size_t numberSlices = 0;
+
 size_t numberHostsSWA = 0;
 size_t numberHostsSWB = 0;
 
@@ -102,26 +99,13 @@ SliceInfoList_t slices;
 
 //Vectors to allocate the ports of the switches
 TopologyPorts_t switchPorts;
-PortsVector_t interSwitchesPorts;
+
 
 //Containers that will store Node, NetDevice and Interface objects
 TopologyNodes_t sliceNodes;
 TopologyNetDevices_t sliceNetDevices;
 TopologyIfaces_t sliceInterfaces;
-NodeContainer switches;
 
-//Variable to set the ofswitch13 devices on the switches
-OFSwitch13DeviceContainer switchDevices;
-
-//Helper to configure the controller and the switches
-Ptr<OFSwitch13InternalHelper> of13Helper;
-Ptr<Node> controllerNode;
-Ptr<Controller> controllerApp;
-
-//Containers and helper to configure de CSMA links between hosts and switches
-NetDeviceContainer pairDevs;
-CsmaHelper csmaHelperEndPoints;
-CsmaHelper csmaHelperinterSwitchesPorts;
 
 
 int
@@ -163,10 +147,10 @@ main (int argc, char *argv[])
   // Read the topology configuration file. This file is optional.
   // With this file, it is possible to override default attribute values.
   std::string topoFilename = prefix + ".topo";
-  std::ifstream topoTestFile (topoFilename.c_str (), std::ifstream::in);
-  if (topoTestFile.good ())
+  std::ifstream testFile (topoFilename.c_str (), std::ifstream::in);
+  if (testFile.good ())
     {
-      topoTestFile.close ();
+      testFile.close ();
 
       NS_LOG_INFO ("Reading attributes file: " << topoFilename);
       Config::SetDefault ("ns3::ConfigStore::Mode", StringValue ("Load"));
@@ -184,57 +168,110 @@ main (int argc, char *argv[])
   NS_LOG_INFO ("Creating the simulation scenario...");
 
 
-// // Read the slice configuration file. This file is mandatory.
-  // std::string slcFilename = prefix + ".slc";
-  // std::ifstream slcTestFile (slcFilename.c_str (), std::ifstream::in);
-  // NS_ASSERT_MSG (slcTestFile.good (), "Invalid slice config file " << slcFilename);
-  // slcTestFile.close ();
+  // --------------------------------------------------------------------------
+  // Configuring the OpenFlow network with three switches in line.
+
+  Ptr<OFSwitch13InternalHelper> of13Helper = CreateObject<OFSwitch13InternalHelper>();
+  of13Helper->SetDeviceAttribute ("PipelineTables", UintegerValue (OFS_TAB_TOTAL));
+
+  // Create the controller node and configure it.
+  Ptr<Node> controllerNode = CreateObject<Node> ();
+  Ptr<Controller> controllerApp = CreateObject<Controller>();;
+  of13Helper->InstallController (controllerNode, controllerApp);
+
+  // Create the switch nodes and configure them.
+  NodeContainer switchNodes;
+  switchNodes.Create (3);
+  Names::Add ("A", switchNodes.Get (0));
+  Names::Add ("B", switchNodes.Get (1));
+  Names::Add ("C", switchNodes.Get (2));
+
+  OFSwitch13DeviceContainer switchDevices;
+  switchDevices = of13Helper->InstallSwitch (switchNodes);
+
+  CsmaHelper csmaHelper;
+  csmaHelper.SetChannelAttribute ("DataRate", DataRateValue (DataRate ("100Mbps")));
+  csmaHelper.SetChannelAttribute ("Delay", TimeValue (MilliSeconds (0)));
+
+  NetDeviceContainer pairDevs;
+  PortsList_t switchPorts;
+
+  // Connect switch A to switch B
+  pairDevs = csmaHelper.Install (switchNodes.Get (0), switchNodes.Get (1));
+  switchPorts.push_back (switchDevices.Get (0)->AddSwitchPort (pairDevs.Get (0)));
+  switchPorts.push_back (switchDevices.Get (1)->AddSwitchPort (pairDevs.Get (1)));
+  CreateObject<LinkInfo> (switchPorts[0], switchPorts[1],
+                          DynamicCast<CsmaChannel> (pairDevs.Get (0)->GetChannel ()));
+
+  // Connect switch B to switch C
+  pairDevs = csmaHelper.Install (switchNodes.Get (1), switchNodes.Get (2));
+  switchPorts.push_back (switchDevices.Get (1)->AddSwitchPort (pairDevs.Get (0)));
+  switchPorts.push_back (switchDevices.Get (2)->AddSwitchPort (pairDevs.Get (1)));
+  CreateObject<LinkInfo> (switchPorts[2], switchPorts[3],
+                          DynamicCast<CsmaChannel> (pairDevs.Get (0)->GetChannel ()));
+
+  // Create the OpenFlow channel.
+  of13Helper->CreateOpenFlowChannels ();
+
+  // PCAP tracing
+  if (trace)
+    {
+      std::string pcapPrefix = outputPrefix.str ();
+      csmaHelper.EnablePcap (pcapPrefix + "sw", switchNodes, true);
+      of13Helper->EnableOpenFlowPcap (pcapPrefix + "crtl", true);
+    }
+
+  // Notify the controler about the OpenFlow switches.
+  controllerApp->NotifySwitches (switchPorts, switchDevices);
+
+
+  // --------------------------------------------------------------------------
+  // Configure the network slices
+
+  // Read the slice configuration file. This file is mandatory.
+  std::string slcFilename = prefix + ".slices";
+  std::ifstream slcFile (slcFilename.c_str (), std::ifstream::in);
+  NS_ASSERT_MSG (slcFile.good (), "Invalid slice config file " << slcFilename);
+
+  int numberSlices = 0;
+  int sumQuota = 0;
+  std::string lineBuffer;
+  while (!slcFile.eof ())
+    {
+      // Read the next non-empty line.
+      getline (slcFile, lineBuffer);
+      if (lineBuffer.empty ())
+        {
+          continue;
+        }
+
+      ObjectFactory sliceFac;
+      SliceFactoryParse (lineBuffer, sliceFac);
+      sliceFac.Set ("SliceId", UintegerValue (numberSlices + 1));
+      Ptr<SliceInfo> slice = sliceFac.Create<SliceInfo>();
+
+      sumQuota += slice->GetQuota ();
+      NS_ASSERT_MSG (sumQuota <= 100, "Quota exceeded");
+
+      numberSlices++;
+    }
+  slcFile.close ();
 
 
 
-  // // Create the OpenFlow network.
-
-  // //Do the proper configuration onto hosts, servers and switches.
-  // controllerNode = CreateObject<Node> ();
-  // if (config.size () != 0)
-  //   {
-
-  //     configureSwitches ();
-  //     controllerApp->NotifySwitches (interSwitchesPorts, switchDevices);
-
-  //     configureSlices (config);
-  //     controllerApp->NotifyClientsServers (sliceInterfaces, switchPorts);
-
-  //     controllerApp->ConfigureMeters (slices);
-  //   }
+  csmaHelper.SetChannelAttribute ("DataRate", DataRateValue (DataRate ("100Gbps")));
+  csmaHelper.SetChannelAttribute ("Delay", TimeValue (MilliSeconds (0)));
 
 
-  // // Set the name for each host node.
-  // for (size_t i = 0; i < numberSlices; i++)
-  //   {
 
-  //     std::string NameHosts;
-  //     std::string NameServers;
 
-  //     for (size_t j = 0; j < sliceNodes[i][HOSTS_SWA].GetN (); j++)
-  //       {
-  //         NameHosts = "Slice" + std::to_string (i) + "hostSWA" + std::to_string (j + 1);
-  //         Names::Add (NameHosts, sliceNodes[i][HOSTS_SWA].Get (j));
-  //       }
 
-  //     for (size_t j = 0; j < sliceNodes[i][HOSTS_SWB].GetN (); j++)
-  //       {
-  //         NameHosts = "Slice" + std::to_string (i) + "hostSWB" + std::to_string (j + 1);
-  //         Names::Add (NameHosts, sliceNodes[i][HOSTS_SWB].Get (j));
-  //       }
+  // Notify the controler about the network slices. FIXME
+  // controllerApp->NotifyClientsServers (sliceInterfaces, switchPorts);
+  // controllerApp->ConfigureMeters (slices);
 
-  //     for (size_t j = 0; j < sliceNodes[i][SERVERS].GetN (); j++)
-  //       {
-  //         NameServers = "Slice" + std::to_string (i) + "server" + std::to_string (j + 1);
-  //         Names::Add (NameServers, sliceNodes[i][SERVERS].Get (j));
-  //       }
 
-  //   }
+
 
   // //Configure the application
   // for (size_t i = 0; i < numberSlices; i++)
@@ -259,34 +296,6 @@ main (int argc, char *argv[])
   //     appHelper->Install (sliceNodes[i][ALL_HOSTS], sliceNodes[i][SERVERS],
   //                         sliceInterfaces[i][ALL_HOSTS], sliceInterfaces[i][SERVERS]);
 
-  //   }
-
-
-  // // Enable datapath stats and pcap traces at hosts, switch(es), and controller(s)
-  // if (trace)
-  //   {
-  //     of13Helper->EnableOpenFlowPcap ("openflow");
-  //     of13Helper->EnableDatapathStats ("switch-stats");
-  //     //csmaHelperinterSwitchesPorts.EnablePcapAll("logPcap", true);
-
-  //     for (size_t i = 0; i < numberSlices; i++)
-  //       {
-
-  //         for (size_t j = 0; j < sliceNodes[i][HOSTS_SWA].GetN (); j++)
-  //           {
-  //             csmaHelperinterSwitchesPorts.EnablePcap ("hostSWA", sliceNetDevices[i][0], true);
-  //           }
-
-  //         for (size_t j = 0; j < sliceNodes[i][HOSTS_SWB].GetN (); j++)
-  //           {
-  //             csmaHelperinterSwitchesPorts.EnablePcap ("hostSWB", sliceNetDevices[i][1], true);
-  //           }
-
-  //         for (size_t j = 0; j < sliceNodes[i][SERVERS].GetN (); j++)
-  //           {
-  //             csmaHelperinterSwitchesPorts.EnablePcap ("server", sliceNetDevices[i][2], true);
-  //           }
-  //       }
   //   }
 
   // Set stop time and run the simulation.
@@ -316,14 +325,14 @@ main (int argc, char *argv[])
 }
 
 void
-parse (std::string v, ObjectFactory &factory)
+SliceFactoryParse (std::string str, ObjectFactory &factory)
 {
   std::string::size_type lbracket, rbracket;
-  lbracket = v.find ("[");
-  rbracket = v.find ("]");
+  lbracket = str.find ("[");
+  rbracket = str.find ("]");
   if (lbracket == std::string::npos && rbracket == std::string::npos)
     {
-      factory.SetTypeId (v);
+      factory.SetTypeId (str);
       return;
     }
   if (lbracket == std::string::npos || rbracket == std::string::npos)
@@ -332,8 +341,8 @@ parse (std::string v, ObjectFactory &factory)
     }
   NS_ASSERT (lbracket != std::string::npos);
   NS_ASSERT (rbracket != std::string::npos);
-  std::string tid = v.substr (0, lbracket);
-  std::string parameters = v.substr (lbracket + 1,rbracket - (lbracket + 1));
+  std::string tid = str.substr (0, lbracket);
+  std::string parameters = str.substr (lbracket + 1,rbracket - (lbracket + 1));
   factory.SetTypeId (tid);
   std::string::size_type cur;
   cur = 0;
@@ -366,13 +375,10 @@ parse (std::string v, ObjectFactory &factory)
                   value = parameters.substr (equal + 1, next - (equal + 1));
                   cur = next + 1;
                 }
-
               factory.Set (name, StringValue (value));
-
             }
         }
     }
-  return;
 }
 
 void
@@ -437,248 +443,180 @@ void
 configureSlices (std::string config)
 {
 
-  std::ifstream file;
-  file.open (config);
-  std::string buffer;
-
-  NS_ASSERT_MSG (file.is_open (), "Error while opening the file");
-
-  int maxQuota = 0;
-  int currQuota;
-  int currNumberHostsSWA;
-  int currNumberHostsSWB;
-  int currSlice;
-
-  //Addressing info
-  InternetStackHelper internet;
-  Ipv4AddressHelper ipv4helpr;
-  std::string baseAddressStr = "0.x.y.1";
-  Ipv4Address baseAddress;
-
-  while (!file.eof ())
-    {
-
-      getline (file, buffer);
 
 
-      ObjectFactory sliceFac;
-      parse (buffer, sliceFac);
-      sliceFac.Set ("SliceId", UintegerValue (numberSlices + 1));
-      Ptr<SliceInfo> slice = sliceFac.Create<SliceInfo>();
+  // int maxQuota = 0;
+  // int currQuota;
+  // int currNumberHostsSWA;
+  // int currNumberHostsSWB;
+  // int currSlice;
 
-      currSlice = (slice->GetSliceId () - 1);
-      currQuota = slice->GetQuota ();
-      currNumberHostsSWA = slice->GetHostsA ();
-      currNumberHostsSWB = slice->GetHostsB ();
-      numberHostsSWA += currNumberHostsSWA;
-      numberHostsSWB += currNumberHostsSWB;
-      maxQuota += currQuota;
+  // //Addressing info
+  // InternetStackHelper internet;
+  // Ipv4AddressHelper ipv4helpr;
+  // std::string baseAddressStr = "0.x.y.1";
+  // Ipv4Address baseAddress;
 
-      NS_ASSERT_MSG (maxQuota <= 100, "Quota exceeded");
-
-      slices.push_back (slice);
-
-      //Creates the NodeContainers and assign them to the respective slice
-      NodeContainer hostsSWA;
-      NodeContainer hostsSWB;
-      NodeContainer servers;
-
-      hostsSWA.Create (currNumberHostsSWA);
-      hostsSWB.Create (currNumberHostsSWB);
-      servers.Create (currNumberHostsSWA + currNumberHostsSWB);
-
-      std::vector<NodeContainer> machines;
-
-      machines.push_back (hostsSWA);
-      machines.push_back (hostsSWB);
-      machines.push_back (servers);
-
-
-      NodeContainer allHostsPerSliceContainer (hostsSWA, hostsSWB);
-
-      machines.push_back (allHostsPerSliceContainer);
-
-      sliceNodes.push_back (machines);
-
-      //Configure the CSMA links between hosts and switches for each devices
-      std::vector<Ptr<OFSwitch13Port> > hostsSWAports;
-      std::vector<Ptr<OFSwitch13Port> > hostsSWBports;
-      std::vector<Ptr<OFSwitch13Port> > serverPorts;
-
-      std::vector<std::vector<Ptr<OFSwitch13Port> > > ports;
-
-      ports.push_back (hostsSWAports);
-      ports.push_back (hostsSWBports);
-      ports.push_back (serverPorts);
-
-      switchPorts.push_back (ports);
-
-      NetDeviceContainer hostDevicesSWA;
-      NetDeviceContainer hostDevicesSWB;
-      NetDeviceContainer serversDevices;
-
-      //Configuring CSMA links of the hostsSWA
-      for (size_t j = 0; j < sliceNodes[currSlice][HOSTS_SWA].GetN (); j++)
-        {
-          pairDevs = csmaHelperEndPoints.Install (sliceNodes[currSlice][HOSTS_SWA].Get (j), switches.Get (0));
-          hostDevicesSWA.Add (pairDevs.Get (0));
-          switchPorts[currSlice][HOSTS_SWA].push_back (switchDevices.Get (0)->AddSwitchPort (pairDevs.Get (1)));
-        }
-
-      //Configuring CSMA links of the hostsSWB
-      for (size_t j = 0; j < sliceNodes[currSlice][HOSTS_SWB].GetN (); j++)
-        {
-          pairDevs = csmaHelperEndPoints.Install (sliceNodes[currSlice][HOSTS_SWB].Get (j), switches.Get (1));
-          hostDevicesSWB.Add (pairDevs.Get (0));
-          switchPorts[currSlice][HOSTS_SWB].push_back (switchDevices.Get (1)->AddSwitchPort (pairDevs.Get (1)));
-        }
-
-      //Configuring CSMA links of the servers
-      for (size_t j = 0; j < sliceNodes[currSlice][SERVERS].GetN (); j++)
-        {
-          pairDevs = csmaHelperEndPoints.Install (sliceNodes[currSlice][SERVERS].Get (j), switches.Get (2));
-          serversDevices.Add (pairDevs.Get (0));
-          switchPorts[currSlice][SERVERS].push_back (switchDevices.Get (2)->AddSwitchPort (pairDevs.Get (1)));
-        }
-
-      std::vector<NetDeviceContainer> devices;
-
-      devices.push_back (hostDevicesSWA);
-      devices.push_back (hostDevicesSWB);
-      devices.push_back (serversDevices);
-
-      sliceNetDevices.push_back (devices);
-
-      //Install the TCP/IP stack into hosts nodes (All hosts of all slices)
-      internet.Install (sliceNodes[currSlice][HOSTS_SWA]); //HostsSWA
-      internet.Install (sliceNodes[currSlice][HOSTS_SWB]); //HostsSWB
-      internet.Install (sliceNodes[currSlice][SERVERS]); //Servers
-
-      //Set IPv4 host addresses
-      Ipv4InterfaceContainer hostIpIfacesSWA;
-      Ipv4InterfaceContainer hostIpIfacesSWB;
-      Ipv4InterfaceContainer serversIpIfaces;
-
-      std::string baseAddressTmp = baseAddressStr;
-
-      //Number to identify if the address is given to a host or a server
-      int hostServer = 1;
-
-      std::string slice_id = std::to_string (currSlice);
-      std::string hostServer_str = std::to_string (hostServer);
-
-      boost::replace_all (baseAddressTmp, "x", slice_id);
-      boost::replace_all (baseAddressTmp, "y", hostServer_str);
-
-      baseAddress.Set (baseAddressTmp.c_str ());
-      ipv4helpr.SetBase ("10.0.0.0", "255.0.0.0", baseAddress);
-      hostIpIfacesSWA = ipv4helpr.Assign (sliceNetDevices[currSlice][HOSTS_SWA]); //hostDevicesSWA
-      hostIpIfacesSWB = ipv4helpr.Assign (sliceNetDevices[currSlice][HOSTS_SWB]); //hostDevicesSWB
-
-
-      baseAddressTmp = baseAddressStr;
-      hostServer = hostServer + 1;
-      hostServer_str = std::to_string (hostServer);
-      boost::replace_all (baseAddressTmp, "x", slice_id);
-      boost::replace_all (baseAddressTmp, "y", hostServer_str);
-
-
-      baseAddress.Set (baseAddressTmp.c_str ());
-      ipv4helpr.SetBase ("10.0.0.0", "255.0.0.0", baseAddress);
-      serversIpIfaces = ipv4helpr.Assign (sliceNetDevices[currSlice][SERVERS]); //serversDevices
-
-      Ipv4InterfaceContainer allHostsIpIfaces;
-      allHostsIpIfaces.Add (hostIpIfacesSWA);
-      allHostsIpIfaces.Add (hostIpIfacesSWB);
-
-      std::vector<Ipv4InterfaceContainer> interfaces;
-
-      interfaces.push_back (hostIpIfacesSWA);
-      interfaces.push_back (hostIpIfacesSWB);
-      interfaces.push_back (serversIpIfaces);
-      interfaces.push_back (allHostsIpIfaces);
-
-      sliceInterfaces.push_back (interfaces);
-
-      numberSlices++;
-    }
-
-  std::stable_sort (slices.begin (), slices.end (), PriComp);
-
-  for (std::vector<Ptr<SliceInfo> >::iterator it = slices.begin (); it != slices.end (); ++it)
-    {
-      std::cout << "SliceId = " << (*it)->GetSliceId () << "| ";
-      std::cout << "Prio = " << (*it)->GetPriority () << "| ";
-      std::cout << "Quota = " << (*it)->GetQuota () << "| ";
-      std::cout << "HostsSWA = " << (*it)->GetHostsA () << "| ";
-      std::cout << "HostsSWB = " << (*it)->GetHostsB () << std::endl;
-    }
-
-  file.close ();
-}
-
-void
-configureSwitches ()
-{
-
-  of13Helper = CreateObject<OFSwitch13InternalHelper>();
-  of13Helper->SetDeviceAttribute ("PipelineTables", UintegerValue (3));
-
-  switches.Create (3);
-
-  //To use in LinkInfo Ccreation
-  Ptr<CsmaNetDevice> currPortDev, nextPortDev;
-
-  //Use the CsmaHelper to inter-connect switches
-  switchDevices = of13Helper->InstallSwitch (switches);
-
-
-  csmaHelperinterSwitchesPorts.SetChannelAttribute ("DataRate", DataRateValue (DataRate ("100Mbps")));
-  csmaHelperinterSwitchesPorts.SetChannelAttribute ("Delay", TimeValue (MilliSeconds (0)));
-
-
-  csmaHelperEndPoints.SetChannelAttribute ("DataRate", DataRateValue (DataRate ("100Gbps")));
-  csmaHelperEndPoints.SetChannelAttribute ("Delay", TimeValue (MilliSeconds (0)));
-
-  pairDevs = csmaHelperinterSwitchesPorts.Install (switches.Get (0), switches.Get (1));
-  interSwitchesPorts.push_back (switchDevices.Get (0)->AddSwitchPort (pairDevs.Get (0)));
-  interSwitchesPorts.push_back (switchDevices.Get (1)->AddSwitchPort (pairDevs.Get (1)));
-
-  // //Tracing
-  // if (trace)
+  // while (!file.eof ())
   //   {
 
-  //     csmaHelperinterSwitchesPorts.EnablePcap ("SWA", pairDevs.Get (0), true);
-  //     csmaHelperinterSwitchesPorts.EnablePcap ("SWB-LEFT", pairDevs.Get (1), true);
+  //     getline (file, buffer);
 
+
+  //     ObjectFactory sliceFac;
+  //     parse (buffer, sliceFac);
+  //     sliceFac.Set ("SliceId", UintegerValue (numberSlices + 1));
+  //     Ptr<SliceInfo> slice = sliceFac.Create<SliceInfo>();
+
+  //     currSlice = (slice->GetSliceId () - 1);
+  //     currQuota = slice->GetQuota ();
+  //     currNumberHostsSWA = slice->GetHostsA ();
+  //     currNumberHostsSWB = slice->GetHostsB ();
+  //     numberHostsSWA += currNumberHostsSWA;
+  //     numberHostsSWB += currNumberHostsSWB;
+  //     maxQuota += currQuota;
+
+  //     NS_ASSERT_MSG (maxQuota <= 100, "Quota exceeded");
+
+  //     slices.push_back (slice);
+
+  //     //Creates the NodeContainers and assign them to the respective slice
+  //     NodeContainer hostsSWA;
+  //     NodeContainer hostsSWB;
+  //     NodeContainer servers;
+
+  //     hostsSWA.Create (currNumberHostsSWA);
+  //     hostsSWB.Create (currNumberHostsSWB);
+  //     servers.Create (currNumberHostsSWA + currNumberHostsSWB);
+
+  //     std::vector<NodeContainer> machines;
+
+  //     machines.push_back (hostsSWA);
+  //     machines.push_back (hostsSWB);
+  //     machines.push_back (servers);
+
+
+  //     NodeContainer allHostsPerSliceContainer (hostsSWA, hostsSWB);
+
+  //     machines.push_back (allHostsPerSliceContainer);
+
+  //     sliceNodes.push_back (machines);
+
+  //     //Configure the CSMA links between hosts and switches for each devices
+  //     std::vector<Ptr<OFSwitch13Port>> hostsSWAports;
+  //     std::vector<Ptr<OFSwitch13Port>> hostsSWBports;
+  //     std::vector<Ptr<OFSwitch13Port>> serverPorts;
+
+  //     std::vector<std::vector<Ptr<OFSwitch13Port>> > ports;
+
+  //     ports.push_back (hostsSWAports);
+  //     ports.push_back (hostsSWBports);
+  //     ports.push_back (serverPorts);
+
+  //     switchPorts.push_back (ports);
+
+  //     NetDeviceContainer hostDevicesSWA;
+  //     NetDeviceContainer hostDevicesSWB;
+  //     NetDeviceContainer serversDevices;
+
+  //     //Configuring CSMA links of the hostsSWA
+  //     for (size_t j = 0; j < sliceNodes[currSlice][HOSTS_SWA].GetN (); j++)
+  //       {
+  //         pairDevs = csmaHelperEndPoints.Install (sliceNodes[currSlice][HOSTS_SWA].Get (j), switches.Get (0));
+  //         hostDevicesSWA.Add (pairDevs.Get (0));
+  //         switchPorts[currSlice][HOSTS_SWA].push_back (switchDevices.Get (0)->AddSwitchPort (pairDevs.Get (1)));
+  //       }
+
+  //     //Configuring CSMA links of the hostsSWB
+  //     for (size_t j = 0; j < sliceNodes[currSlice][HOSTS_SWB].GetN (); j++)
+  //       {
+  //         pairDevs = csmaHelperEndPoints.Install (sliceNodes[currSlice][HOSTS_SWB].Get (j), switches.Get (1));
+  //         hostDevicesSWB.Add (pairDevs.Get (0));
+  //         switchPorts[currSlice][HOSTS_SWB].push_back (switchDevices.Get (1)->AddSwitchPort (pairDevs.Get (1)));
+  //       }
+
+  //     //Configuring CSMA links of the servers
+  //     for (size_t j = 0; j < sliceNodes[currSlice][SERVERS].GetN (); j++)
+  //       {
+  //         pairDevs = csmaHelperEndPoints.Install (sliceNodes[currSlice][SERVERS].Get (j), switches.Get (2));
+  //         serversDevices.Add (pairDevs.Get (0));
+  //         switchPorts[currSlice][SERVERS].push_back (switchDevices.Get (2)->AddSwitchPort (pairDevs.Get (1)));
+  //       }
+
+  //     std::vector<NetDeviceContainer> devices;
+
+  //     devices.push_back (hostDevicesSWA);
+  //     devices.push_back (hostDevicesSWB);
+  //     devices.push_back (serversDevices);
+
+  //     sliceNetDevices.push_back (devices);
+
+  //     //Install the TCP/IP stack into hosts nodes (All hosts of all slices)
+  //     internet.Install (sliceNodes[currSlice][HOSTS_SWA]); //HostsSWA
+  //     internet.Install (sliceNodes[currSlice][HOSTS_SWB]); //HostsSWB
+  //     internet.Install (sliceNodes[currSlice][SERVERS]); //Servers
+
+  //     //Set IPv4 host addresses
+  //     Ipv4InterfaceContainer hostIpIfacesSWA;
+  //     Ipv4InterfaceContainer hostIpIfacesSWB;
+  //     Ipv4InterfaceContainer serversIpIfaces;
+
+  //     std::string baseAddressTmp = baseAddressStr;
+
+  //     //Number to identify if the address is given to a host or a server
+  //     int hostServer = 1;
+
+  //     std::string slice_id = std::to_string (currSlice);
+  //     std::string hostServer_str = std::to_string (hostServer);
+
+  //     boost::replace_all (baseAddressTmp, "x", slice_id);
+  //     boost::replace_all (baseAddressTmp, "y", hostServer_str);
+
+  //     baseAddress.Set (baseAddressTmp.c_str ());
+  //     ipv4helpr.SetBase ("10.0.0.0", "255.0.0.0", baseAddress);
+  //     hostIpIfacesSWA = ipv4helpr.Assign (sliceNetDevices[currSlice][HOSTS_SWA]); //hostDevicesSWA
+  //     hostIpIfacesSWB = ipv4helpr.Assign (sliceNetDevices[currSlice][HOSTS_SWB]); //hostDevicesSWB
+
+
+  //     baseAddressTmp = baseAddressStr;
+  //     hostServer = hostServer + 1;
+  //     hostServer_str = std::to_string (hostServer);
+  //     boost::replace_all (baseAddressTmp, "x", slice_id);
+  //     boost::replace_all (baseAddressTmp, "y", hostServer_str);
+
+
+  //     baseAddress.Set (baseAddressTmp.c_str ());
+  //     ipv4helpr.SetBase ("10.0.0.0", "255.0.0.0", baseAddress);
+  //     serversIpIfaces = ipv4helpr.Assign (sliceNetDevices[currSlice][SERVERS]); //serversDevices
+
+  //     Ipv4InterfaceContainer allHostsIpIfaces;
+  //     allHostsIpIfaces.Add (hostIpIfacesSWA);
+  //     allHostsIpIfaces.Add (hostIpIfacesSWB);
+
+  //     std::vector<Ipv4InterfaceContainer> interfaces;
+
+  //     interfaces.push_back (hostIpIfacesSWA);
+  //     interfaces.push_back (hostIpIfacesSWB);
+  //     interfaces.push_back (serversIpIfaces);
+  //     interfaces.push_back (allHostsIpIfaces);
+
+  //     sliceInterfaces.push_back (interfaces);
+
+  //     numberSlices++;
   //   }
 
-  //Creating the LinkInfo object between SWA - SWB
-  Ptr<CsmaChannel> channelSwaSwb = DynamicCast<CsmaChannel> (pairDevs.Get (0)->GetChannel ());
-  CreateObject<LinkInfo> (interSwitchesPorts[0], interSwitchesPorts[1], channelSwaSwb);
+  // std::stable_sort (slices.begin (), slices.end (), PriComp);
 
-
-  pairDevs = csmaHelperinterSwitchesPorts.Install (switches.Get (1), switches.Get (2));
-  interSwitchesPorts.push_back (switchDevices.Get (1)->AddSwitchPort (pairDevs.Get (0)));
-  interSwitchesPorts.push_back (switchDevices.Get (2)->AddSwitchPort (pairDevs.Get (1)));
-
-  //Creating the LinkInfo object between SWB - ServerSwitch
-  Ptr<CsmaChannel> channelSwbServerSw = DynamicCast<CsmaChannel> (pairDevs.Get (0)->GetChannel ());
-  CreateObject<LinkInfo> (interSwitchesPorts[2], interSwitchesPorts[3], channelSwbServerSw);
-
-  //Inicialize controller
-  controllerApp = CreateObject<Controller>();
-  of13Helper->InstallController (controllerNode, controllerApp);
-  of13Helper->CreateOpenFlowChannels ();
-
-  // //Tracing
-  // if (trace)
+  // for (std::vector<Ptr<SliceInfo>>::iterator it = slices.begin (); it != slices.end (); ++it)
   //   {
-
-  //     csmaHelperinterSwitchesPorts.EnablePcap ("SWB-RIGHT", pairDevs.Get (0), true);
-  //     csmaHelperinterSwitchesPorts.EnablePcap ("SERVERSW", pairDevs.Get (1), true);
-
+  //     std::cout << "SliceId = " << (*it)->GetSliceId () << "| ";
+  //     std::cout << "Prio = " << (*it)->GetPriority () << "| ";
+  //     std::cout << "Quota = " << (*it)->GetQuota () << "| ";
+  //     std::cout << "HostsSWA = " << (*it)->GetHostsA () << "| ";
+  //     std::cout << "HostsSWB = " << (*it)->GetHostsB () << std::endl;
   //   }
+
+  // file.close ();
 }
 
 void

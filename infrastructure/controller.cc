@@ -132,64 +132,56 @@ Controller::NotifyClientsServers (TopologyIfaces_t sliceInterfaces,
 
 }
 
-
 void
-Controller::NotifySwitches (PortsVector_t interSwitchesPorts,
+Controller::NotifySwitches (PortsList_t switchesPorts,
                             OFSwitch13DeviceContainer switchDevices)
 {
-
-
   // Installing the fowarding rules between switches.
 
-  //SWA
+  // Switch A - right
   std::ostringstream cmd;
   cmd << "flow-mod cmd=add,table=0,prio=500"
       << " eth_type=0x0800,ip_dst=10.0.2.0/255.0.255.0"
-      << " write:output=" << interSwitchesPorts[0]->GetPortNo ()
+      << " write:output=" << switchesPorts[0]->GetPortNo ()
       << " goto:1";
   DpctlExecute (switchDevices.Get (0)->GetDpId (), cmd.str ());
 
-  //SWB
+  // Switch B - left
   std::ostringstream cmd2;
   cmd2 << "flow-mod cmd=add,table=0,prio=500"
        << " eth_type=0x0800,ip_dst=10.0.1.0/255.0.255.0"
-       << " write:output=" << interSwitchesPorts[1]->GetPortNo ()
+       << " write:output=" << switchesPorts[1]->GetPortNo ()
        << " goto:1";
   DpctlExecute (switchDevices.Get (1)->GetDpId (), cmd2.str ());
 
-  //SWB
+  // Switch B - right
   std::ostringstream cmd3;
   cmd3 << "flow-mod cmd=add,table=0,prio=500"
        << " eth_type=0x0800,ip_dst=10.0.2.0/255.0.255.0"
-       << " write:output=" << interSwitchesPorts[2]->GetPortNo ()
+       << " write:output=" << switchesPorts[2]->GetPortNo ()
        << " goto:1";
   DpctlExecute (switchDevices.Get (1)->GetDpId (), cmd3.str ());
 
-
-  //Server's Switch
+  // Switch C - left
   std::ostringstream cmd4;
   cmd4 << "flow-mod cmd=add,table=0,prio=500"
        << " eth_type=0x0800,ip_dst=10.0.1.0/255.0.255.0"
-       << " write:output=" << interSwitchesPorts[3]->GetPortNo ()
+       << " write:output=" << switchesPorts[3]->GetPortNo ()
        << " goto:1";
   DpctlExecute (switchDevices.Get (2)->GetDpId (), cmd4.str ());
 
-
-
-  //Get the pointers to link informations
+  // Get the pointers to link informations // FIXME
   m_lInfoA = LinkInfo::GetPointer (1, 2);
   m_lInfoB = LinkInfo::GetPointer (2, 3);
-
-
 }
 
 
 void
-Controller::ConfigureMeters (std::vector<Ptr<SliceInfo> > slices)
+Controller::ConfigureMeters (std::vector<Ptr<SliceInfo>> slices)
 {
 
 
-  for (std::vector<Ptr<SliceInfo> >::iterator it = slices.begin (); it != slices.end (); ++it)
+  for (std::vector<Ptr<SliceInfo>>::iterator it = slices.begin (); it != slices.end (); ++it)
     {
       // Install slicing meters in both link directions.
       for (int d = 0; d < N_LINK_DIRS; d++)

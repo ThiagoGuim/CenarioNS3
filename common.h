@@ -24,6 +24,7 @@
 
 #include <ns3/internet-module.h>
 #include <ns3/core-module.h>
+#include <ns3/ofswitch13-module.h>
 
 namespace ns3 {
 
@@ -37,6 +38,10 @@ typedef enum
   ALL_HOSTS = 3     //!< All the hosts (SWA+SWB) inside de vectors.
 } Indexes;
 // ----------------------------------------------------------------------------
+
+
+typedef std::vector<Ptr<OFSwitch13Port>> PortsList_t;
+
 
 
 // ----------------------------------------------------------------------------
