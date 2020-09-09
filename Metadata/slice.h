@@ -70,6 +70,19 @@ public:
   uint16_t GetHostsB    (void) const;
   //\}
 
+  /**
+   * Get the list of slice information.
+   * \return The const reference to the list of slice information.
+   */
+  static const SliceInfoList_t& GetList (void);
+
+  /**
+   * Get the slice information from the global map for a given ID.
+   * \param sliceId The slice ID.
+   * \return The slice information.
+   */
+  static Ptr<SliceInfo> GetPointer (uint16_t sliceId);
+
 protected:
   /** Destructor implementation. */
   virtual void DoDispose ();

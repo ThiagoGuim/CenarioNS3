@@ -152,6 +152,24 @@ SliceInfo::DoDispose ()
   Object::DoDispose ();
 }
 
+const SliceInfoList_t&
+SliceInfo::GetList (void)
+{
+  return SliceInfo::m_sliceInfoList;
+}
+
+Ptr<SliceInfo>
+SliceInfo::GetPointer (uint16_t sliceId)
+{
+  Ptr<SliceInfo> sInfo = 0;
+  auto ret = SliceInfo::m_sliceInfoById.find (sliceId);
+  if (ret != SliceInfo::m_sliceInfoById.end ())
+    {
+      sInfo = ret->second;
+    }
+  return sInfo;
+}
+
 void
 SliceInfo::RegisterSliceInfo (Ptr<SliceInfo> sInfo)
 {
