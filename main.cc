@@ -198,13 +198,13 @@ main (int argc, char *argv[])
 
 
       // // Define the packet size and interval for UDP traffic.
-      // appHelper->SetPeerAttribute ("PktInterval", StringValue ("ns3::NormalRandomVariable[Mean=0.01|Variance=0.001]"));
-      // appHelper->SetPeerAttribute ("PktSize", StringValue ("ns3::UniformRandomVariable[Min=1024|Max=1460]"));
+      // appHelper->SetBothAttribute ("PktInterval", StringValue ("ns3::NormalRandomVariable[Mean=0.01|Variance=0.001]"));
+      // appHelper->SetBothAttribute ("PktSize", StringValue ("ns3::UniformRandomVariable[Min=1024|Max=1460]"));
 
       // // Disable the traffic at the UDP server node.
       // appHelper->Set2ndAttribute ("PktInterval", StringValue ("ns3::ConstantRandomVariable[Constant=1000000]"));
 
-      appHelper->SetPeerAttribute ("SliceId", UintegerValue (i));
+      appHelper->SetBothAttribute ("SliceId", UintegerValue (i));
       appHelper->Install (sliceNodes[i][ALL_HOSTS], sliceNodes[i][SERVERS],
                           sliceInterfaces[i][ALL_HOSTS], sliceInterfaces[i][SERVERS]);
 

@@ -80,7 +80,7 @@ UdpPeerHelper::Set2ndAttribute (std::string name, const AttributeValue &value)
 }
 
 void
-UdpPeerHelper::SetPeerAttribute (std::string name, const AttributeValue &value)
+UdpPeerHelper::SetBothAttribute (std::string name, const AttributeValue &value)
 {
   m_app1stFactory.Set (name, value);
   m_app2ndFactory.Set (name, value);

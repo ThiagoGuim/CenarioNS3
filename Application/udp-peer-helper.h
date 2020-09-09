@@ -62,7 +62,7 @@ public:
    * \param name the name of the attribute to set.
    * \param value the value of the attribute to set.
    */
-  void SetPeerAttribute (std::string name, const AttributeValue &value);
+  void SetBothAttribute (std::string name, const AttributeValue &value);
 
   /**
    * Install peer applications on input nodes.
