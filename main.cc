@@ -20,36 +20,68 @@
  */
 
 #include <ns3/netanim-module.h>
+#include <ns3/config-store-module.h>
 #include <ns3/core-module.h>
 #include <ns3/network-module.h>
 #include <ns3/csma-module.h>
 #include <ns3/internet-module.h>
 #include <ns3/ofswitch13-module.h>
 #include <ns3/applications-module.h>
-#include <ns3/netanim-module.h>
 #include <ns3/mobility-module.h>
 
 #include <boost/algorithm/string/replace.hpp>
+#include <iomanip>
+#include <iostream>
 #include <string>
 #include <fstream>
+
 #include "infrastructure/controller.h"
 #include "application/udp-peer-helper.h"
 #include "metadata/slice-info.h"
-
 
 using namespace ns3;
 
 NS_LOG_COMPONENT_DEFINE ("Main");
 
+// Prefixes used by input and output filenames.
+static ns3::GlobalValue
+  g_inputPrefix ("InputPrefix", "Common prefix for output filenames.",
+                 ns3::StringValue (std::string ()),
+                 ns3::MakeStringChecker ());
+
+static ns3::GlobalValue
+  g_outputPrefix ("OutputPrefix", "Common prefix for input filenames.",
+                  ns3::StringValue (std::string ()),
+                  ns3::MakeStringChecker ());
+
+// Dump timeout for logging statistics.
+static ns3::GlobalValue
+  g_dumpTimeout ("DumpStatsTimeout", "Periodic statistics dump interval.",
+                 ns3::TimeValue (Seconds (1)),
+                 ns3::MakeTimeChecker ());
+
+// Simulation lenght.
+static ns3::GlobalValue
+  g_simTime ("SimTime", "Simulation stop time.",
+             ns3::TimeValue (Seconds (0)),
+             ns3::MakeTimeChecker ());
+
+// Flag for error messages at the stderr stream.
+static ns3::GlobalValue
+  g_seeLogs ("SeeCerr", "Tell user to check the stderr stream.",
+             ns3::BooleanValue (false),
+             ns3::MakeBooleanChecker ());
+
+void ForceDefaults    (void);
+void EnableProgress   (int);
+void EnableVerbose    (bool);
+void EnableOfsLogs    (bool);
+void CreateAnimation  (bool);
+
 typedef std::vector<std::vector<NodeContainer> > TopologyNodes_t;
 typedef std::vector<std::vector<NetDeviceContainer> > TopologyNetDevices_t;
 
-
-//Print vectors with the switch ports information
-void printPorts ();
-
 //Set animation configurations
-void createAnimation ();
 
 //Nodes and CSMA links configuration
 void configureSwitches ();
@@ -58,15 +90,7 @@ void configureSlices (std::string config);
 //Auxiliar function to parse the string passed by the command line file and get the slice attributes
 void parse (std::string v, ObjectFactory &factory);
 
-//Enable the log functions
-void EnableVerbose (bool enable);
-void EnableOfsLogs (bool enable);
 
-
-///Global variables
-
-//NetAnim or not
-bool createAnim = false;
 
 //Variables storing the topology config
 size_t numberSlices = 0;
@@ -99,163 +123,201 @@ NetDeviceContainer pairDevs;
 CsmaHelper csmaHelperEndPoints;
 CsmaHelper csmaHelperinterSwitchesPorts;
 
-bool trace;
-
-//Prefixes used by output filenames.
-static ns3::GlobalValue
-  g_outputPrefix ("OutputPrefix", "Common prefix for input filenames.",
-                  ns3::StringValue (std::string ()),
-                  ns3::MakeStringChecker ());
-
-// Flag for error messages at the stderr stream.
-static ns3::GlobalValue
-  g_seeLogs ("SeeCerr", "Tell user to check the stderr stream.",
-             ns3::BooleanValue (false),
-             ns3::MakeBooleanChecker ());
 
 int
 main (int argc, char *argv[])
 {
-
-  // Customizing the OpenFlow queue type on switch ports.
-  Config::SetDefault ("ns3::OFSwitch13Port::QueueFactory", StringValue ("ns3::QosQueue"));
-
-  Config::SetDefault ("ns3::CsmaChannel::FullDuplex", BooleanValue (true));
-
-  std::string animFile = "animation.xml";
-  int simTime = 20;
-  bool verbose = false;
-  trace = false;
-  bool ofsLog   = false;
-
-  //Name of the slice config file
-  std::string config = "";
-
+  bool        ofsLog    = false;
+  bool        verbose   = false;
+  bool        trace     = false;
+  int         progress  = 1;
+  std::string prefix    = std::string ();
 
   // Configure command line parameters
   CommandLine cmd;
-  cmd.AddValue ("SimTime", "Simulation time (seconds)", simTime);
-  cmd.AddValue ("Verbose", "Enable verbose output", verbose);
-  cmd.AddValue ("Trace", "Enable datapath stats and pcap traces", trace);
-  cmd.AddValue ("createAnim", "Enable netAnim", createAnim);
-  cmd.AddValue ("Config", "File containing the config info about the slices", config);
+  cmd.AddValue ("Prefix",   "Common prefix for filenames.", prefix);
+  cmd.AddValue ("Progress", "Simulation progress interval (sec).", progress);
+  cmd.AddValue ("Verbose",  "Enable verbose output.", verbose);
   cmd.AddValue ("OfsLog",   "Enable ofsoftswitch13 logs.", ofsLog);
+  cmd.AddValue ("Trace",    "Enable pcap traces", trace);
   cmd.Parse (argc, argv);
 
+  // Update input and output prefixes from command line prefix parameter.
+  // This way, all files from this simulation will have the same prefix.
+  NS_ASSERT_MSG (!prefix.empty (), "Unknown prefix.");
+  std::ostringstream inputPrefix, outputPrefix;
+  inputPrefix << prefix;
+  char lastChar = *prefix.rbegin ();
+  if (lastChar != '-')
+    {
+      inputPrefix << "-";
+    }
+  outputPrefix << inputPrefix.str () << RngSeedManager::GetRun () << "-";
+  Config::SetGlobal ("InputPrefix", StringValue (inputPrefix.str ()));
+  Config::SetGlobal ("OutputPrefix", StringValue (outputPrefix.str ()));
 
-  // Enable checksum computations (required by OFSwitch13 module)
-  GlobalValue::Bind ("ChecksumEnabled", BooleanValue (true));
-
-  //Enable OfsLogs or not
-  EnableOfsLogs (ofsLog);
+  // Enable verbose output for debug purposes.
   EnableVerbose (verbose);
+  EnableOfsLogs (ofsLog);
 
-  //Do the proper configuration onto hosts, servers and switches.
-  controllerNode = CreateObject<Node> ();
-  if (config.size () != 0)
+  // Read the topology configuration file. This file is optional.
+  // With this file, it is possible to override default attribute values.
+  std::string topoFilename = prefix + ".topo";
+  std::ifstream topoTestFile (topoFilename.c_str (), std::ifstream::in);
+  if (topoTestFile.good ())
     {
+      topoTestFile.close ();
 
-      configureSwitches ();
-      controllerApp->NotifySwitches (interSwitchesPorts, switchDevices);
-
-      configureSlices (config);
-      controllerApp->NotifyClientsServers (sliceInterfaces, switchPorts);
-
-      controllerApp->ConfigureMeters (slices);
+      NS_LOG_INFO ("Reading attributes file: " << topoFilename);
+      Config::SetDefault ("ns3::ConfigStore::Mode", StringValue ("Load"));
+      Config::SetDefault ("ns3::ConfigStore::FileFormat", StringValue ("RawText"));
+      Config::SetDefault ("ns3::ConfigStore::Filename", StringValue (topoFilename));
+      ConfigStore inputConfig;
+      inputConfig.ConfigureDefaults ();
     }
 
+  // Parse command line again so users can override values from configuration
+  // file, and force some default attribute values that cannot be overridden.
+  cmd.Parse (argc, argv);
+  ForceDefaults ();
 
-  // Set the name for each host node.
-  for (size_t i = 0; i < numberSlices; i++)
-    {
-
-      std::string NameHosts;
-      std::string NameServers;
-
-      for (size_t j = 0; j < sliceNodes[i][HOSTS_SWA].GetN (); j++)
-        {
-          NameHosts = "Slice" + std::to_string (i) + "hostSWA" + std::to_string (j + 1);
-          Names::Add (NameHosts, sliceNodes[i][HOSTS_SWA].Get (j));
-        }
-
-      for (size_t j = 0; j < sliceNodes[i][HOSTS_SWB].GetN (); j++)
-        {
-          NameHosts = "Slice" + std::to_string (i) + "hostSWB" + std::to_string (j + 1);
-          Names::Add (NameHosts, sliceNodes[i][HOSTS_SWB].Get (j));
-        }
-
-      for (size_t j = 0; j < sliceNodes[i][SERVERS].GetN (); j++)
-        {
-          NameServers = "Slice" + std::to_string (i) + "server" + std::to_string (j + 1);
-          Names::Add (NameServers, sliceNodes[i][SERVERS].Get (j));
-        }
-
-    }
-
-  //Configure the application
-  for (size_t i = 0; i < numberSlices; i++)
-    {
-      Ptr<ExponentialRandomVariable> startRng = CreateObject<ExponentialRandomVariable> ();
-      startRng->SetAttribute ("Mean", DoubleValue (5));
-
-      // Configuring traffic patterns for this slice
-      Ptr<UdpPeerHelper> appHelper = CreateObject<UdpPeerHelper> ();
-      appHelper->SetAttribute ("NumApps", UintegerValue (20));
-      appHelper->SetAttribute ("StartInterval", PointerValue (startRng));
+  NS_LOG_INFO ("Creating the simulation scenario...");
 
 
-      // // Define the packet size and interval for UDP traffic.
-      // appHelper->SetBothAttribute ("PktInterval", StringValue ("ns3::NormalRandomVariable[Mean=0.01|Variance=0.001]"));
-      // appHelper->SetBothAttribute ("PktSize", StringValue ("ns3::UniformRandomVariable[Min=1024|Max=1460]"));
-
-      // // Disable the traffic at the UDP server node.
-      // appHelper->Set2ndAttribute ("PktInterval", StringValue ("ns3::ConstantRandomVariable[Constant=1000000]"));
-
-      appHelper->SetBothAttribute ("SliceId", UintegerValue (i));
-      appHelper->Install (sliceNodes[i][ALL_HOSTS], sliceNodes[i][SERVERS],
-                          sliceInterfaces[i][ALL_HOSTS], sliceInterfaces[i][SERVERS]);
-
-    }
+// // Read the slice configuration file. This file is mandatory.
+  // std::string slcFilename = prefix + ".slc";
+  // std::ifstream slcTestFile (slcFilename.c_str (), std::ifstream::in);
+  // NS_ASSERT_MSG (slcTestFile.good (), "Invalid slice config file " << slcFilename);
+  // slcTestFile.close ();
 
 
-  // Enable datapath stats and pcap traces at hosts, switch(es), and controller(s)
-  if (trace)
-    {
-      of13Helper->EnableOpenFlowPcap ("openflow");
-      of13Helper->EnableDatapathStats ("switch-stats");
-      //csmaHelperinterSwitchesPorts.EnablePcapAll("logPcap", true);
 
-      for (size_t i = 0; i < numberSlices; i++)
-        {
+  // // Create the OpenFlow network.
 
-          for (size_t j = 0; j < sliceNodes[i][HOSTS_SWA].GetN (); j++)
-            {
-              csmaHelperinterSwitchesPorts.EnablePcap ("hostSWA", sliceNetDevices[i][0], true);
-            }
+  // //Do the proper configuration onto hosts, servers and switches.
+  // controllerNode = CreateObject<Node> ();
+  // if (config.size () != 0)
+  //   {
 
-          for (size_t j = 0; j < sliceNodes[i][HOSTS_SWB].GetN (); j++)
-            {
-              csmaHelperinterSwitchesPorts.EnablePcap ("hostSWB", sliceNetDevices[i][1], true);
-            }
+  //     configureSwitches ();
+  //     controllerApp->NotifySwitches (interSwitchesPorts, switchDevices);
 
-          for (size_t j = 0; j < sliceNodes[i][SERVERS].GetN (); j++)
-            {
-              csmaHelperinterSwitchesPorts.EnablePcap ("server", sliceNetDevices[i][2], true);
-            }
-        }
-    }
+  //     configureSlices (config);
+  //     controllerApp->NotifyClientsServers (sliceInterfaces, switchPorts);
 
-  // Run the simulation
-  Simulator::Stop (Seconds (simTime));
+  //     controllerApp->ConfigureMeters (slices);
+  //   }
+
+
+  // // Set the name for each host node.
+  // for (size_t i = 0; i < numberSlices; i++)
+  //   {
+
+  //     std::string NameHosts;
+  //     std::string NameServers;
+
+  //     for (size_t j = 0; j < sliceNodes[i][HOSTS_SWA].GetN (); j++)
+  //       {
+  //         NameHosts = "Slice" + std::to_string (i) + "hostSWA" + std::to_string (j + 1);
+  //         Names::Add (NameHosts, sliceNodes[i][HOSTS_SWA].Get (j));
+  //       }
+
+  //     for (size_t j = 0; j < sliceNodes[i][HOSTS_SWB].GetN (); j++)
+  //       {
+  //         NameHosts = "Slice" + std::to_string (i) + "hostSWB" + std::to_string (j + 1);
+  //         Names::Add (NameHosts, sliceNodes[i][HOSTS_SWB].Get (j));
+  //       }
+
+  //     for (size_t j = 0; j < sliceNodes[i][SERVERS].GetN (); j++)
+  //       {
+  //         NameServers = "Slice" + std::to_string (i) + "server" + std::to_string (j + 1);
+  //         Names::Add (NameServers, sliceNodes[i][SERVERS].Get (j));
+  //       }
+
+  //   }
+
+  // //Configure the application
+  // for (size_t i = 0; i < numberSlices; i++)
+  //   {
+  //     Ptr<ExponentialRandomVariable> startRng = CreateObject<ExponentialRandomVariable> ();
+  //     startRng->SetAttribute ("Mean", DoubleValue (5));
+
+  //     // Configuring traffic patterns for this slice
+  //     Ptr<UdpPeerHelper> appHelper = CreateObject<UdpPeerHelper> ();
+  //     appHelper->SetAttribute ("NumApps", UintegerValue (20));
+  //     appHelper->SetAttribute ("StartInterval", PointerValue (startRng));
+
+
+  //     // // Define the packet size and interval for UDP traffic.
+  //     // appHelper->SetBothAttribute ("PktInterval", StringValue ("ns3::NormalRandomVariable[Mean=0.01|Variance=0.001]"));
+  //     // appHelper->SetBothAttribute ("PktSize", StringValue ("ns3::UniformRandomVariable[Min=1024|Max=1460]"));
+
+  //     // // Disable the traffic at the UDP server node.
+  //     // appHelper->Set2ndAttribute ("PktInterval", StringValue ("ns3::ConstantRandomVariable[Constant=1000000]"));
+
+  //     appHelper->SetBothAttribute ("SliceId", UintegerValue (i));
+  //     appHelper->Install (sliceNodes[i][ALL_HOSTS], sliceNodes[i][SERVERS],
+  //                         sliceInterfaces[i][ALL_HOSTS], sliceInterfaces[i][SERVERS]);
+
+  //   }
+
+
+  // // Enable datapath stats and pcap traces at hosts, switch(es), and controller(s)
+  // if (trace)
+  //   {
+  //     of13Helper->EnableOpenFlowPcap ("openflow");
+  //     of13Helper->EnableDatapathStats ("switch-stats");
+  //     //csmaHelperinterSwitchesPorts.EnablePcapAll("logPcap", true);
+
+  //     for (size_t i = 0; i < numberSlices; i++)
+  //       {
+
+  //         for (size_t j = 0; j < sliceNodes[i][HOSTS_SWA].GetN (); j++)
+  //           {
+  //             csmaHelperinterSwitchesPorts.EnablePcap ("hostSWA", sliceNetDevices[i][0], true);
+  //           }
+
+  //         for (size_t j = 0; j < sliceNodes[i][HOSTS_SWB].GetN (); j++)
+  //           {
+  //             csmaHelperinterSwitchesPorts.EnablePcap ("hostSWB", sliceNetDevices[i][1], true);
+  //           }
+
+  //         for (size_t j = 0; j < sliceNodes[i][SERVERS].GetN (); j++)
+  //           {
+  //             csmaHelperinterSwitchesPorts.EnablePcap ("server", sliceNetDevices[i][2], true);
+  //           }
+  //       }
+  //   }
+
+  // Set stop time and run the simulation.
+  std::cout << "Simulating..." << std::endl;
+  EnableProgress (progress);
+
+  TimeValue timeValue;
+  GlobalValue::GetValueByName ("SimTime", timeValue);
+  Time stopAt = timeValue.Get () + MilliSeconds (100);
+
+  Simulator::Stop (stopAt);
   Simulator::Run ();
+
+  // Finish the simulation.
   Simulator::Destroy ();
 
+  // Print the final status message.
+  BooleanValue cerrValue;
+  GlobalValue::GetValueByName ("SeeCerr", cerrValue);
+  std::cout << "END OK";
+  if (cerrValue.Get ())
+    {
+      std::cout << " - WITH ERRORS";
+    }
+  std::cout << std::endl;
+  return 0;
 }
 
 void
 parse (std::string v, ObjectFactory &factory)
 {
-
   std::string::size_type lbracket, rbracket;
   lbracket = v.find ("[");
   rbracket = v.find ("]");
@@ -310,104 +372,58 @@ parse (std::string v, ObjectFactory &factory)
             }
         }
     }
-
   return;
 }
 
 void
-printPorts ()
+CreateAnimation (bool animation)
 {
-
-  for (size_t i = 0; i < numberSlices; i++)
+  if (animation)
     {
+      // // Create the animation object and configure for specified output
+      // std::string animFile = "animation.xml";
 
-      for (size_t j = 0; j < switchPorts[i][HOSTS_SWA].size (); j++)
-        {
+      // Ptr<ListPositionAllocator> listPosAllocator;
+      // listPosAllocator = CreateObject<ListPositionAllocator> ();
 
-          std::cout << "SLICE " << i << " PORTAS SWA : ";
-          std::cout << switchPorts[i][HOSTS_SWA][j] -> GetPortNo () << std::endl;
-        }
-      std::cout << "----------------" << std::endl;
+      // listPosAllocator->Add (Vector (  75, 25, 0)); // Switch A
+      // listPosAllocator->Add (Vector ( 100, 25, 0)); // Switch B
+      // listPosAllocator->Add (Vector ( 125, 25, 0)); // Switch C
+      // listPosAllocator->Add (Vector ( 100, 50, 0)); // Controller
 
-      for (size_t j = 0; j < switchPorts[i][HOSTS_SWB].size (); j ++)
-        {
-          std::cout << "SLICE " << i << " PORTAS SWB : ";
-          std::cout << switchPorts[i][HOSTS_SWB][j] -> GetPortNo () << std::endl;
-        }
-      std::cout << "----------------" << std::endl;
+      // NodeContainer allHosts;
+      // NodeContainer allServers;
 
-      for (size_t j = 0; j < switchPorts[i][SERVERS].size (); j ++)
-        {
-          std::cout << "SLICE " << i << " PORTAS SERVERS : ";
-          std::cout << switchPorts[i][SERVERS][j] -> GetPortNo () << std::endl;
-        }
-      std::cout << "----------------" << std::endl;
+      // int start = 0;
+      // for (size_t i = 0; i < numberSlices; i ++)
+      // {
+
+      //   size_t j = 0;
+
+      //   for (j = 0; j < sliceNodes[i][ALL_HOSTS].GetN (); j ++)  //Clients-hosts
+      //   {
+      //     listPosAllocator->Add (Vector (0, (start + 25 * j), 0));
+      //   }
+
+      //   for (j = 0; j < sliceNodes[i][SERVERS].GetN (); j++)   //Servers
+      //     {
+      //       listPosAllocator->Add (Vector (200, (start + 25 * j), 0));
+      //     }
+
+      //   start = start + (25 * j);
+
+      //   allHosts.Add (sliceNodes[i][ALL_HOSTS]);
+      //   allServers.Add (sliceNodes[i][SERVERS]);
+      // }
+
+
+
+      // MobilityHelper mobilityHelper;
+      // mobilityHelper.SetMobilityModel ("ns3::ConstantPositionMobilityModel");
+      // mobilityHelper.SetPositionAllocator (listPosAllocator);
+      // mobilityHelper.Install (NodeContainer (switches, controllerNode, allHosts, allServers));
 
     }
-
-
-  for (size_t i = 0; i < interSwitchesPorts.size (); i ++)
-    {
-      std::cout << " PORTAS INTER SWITCH : ";
-      std::cout << interSwitchesPorts[i] -> GetPortNo () << std::endl;
-    }
-  std::cout << "----------------" << std::endl;
-
-}
-
-void
-createAnimation ()
-{
-  // Create the animation object and configure for specified output
-
-  if (createAnim)
-    {
-
-      Ptr<ListPositionAllocator> listPosAllocator;
-      listPosAllocator = CreateObject<ListPositionAllocator> ();
-
-
-      listPosAllocator->Add (Vector (  75,  25, 0));// switch A
-      listPosAllocator->Add (Vector (  100, 25, 0));// switch B
-      listPosAllocator->Add (Vector ( 125, 25, 0)); // switch Servers
-      listPosAllocator->Add (Vector ( 100, 50, 0)); // controller
-
-
-      NodeContainer allHosts;
-      NodeContainer allServers;
-
-      int start = 0;
-      for (size_t i = 0; i < numberSlices; i ++)
-      {
-
-        size_t j = 0;
-
-        for (j = 0; j < sliceNodes[i][ALL_HOSTS].GetN (); j ++)  //Clients-hosts
-        {
-          listPosAllocator->Add (Vector (0, (start + 25 * j), 0));
-        }
-
-        for (j = 0; j < sliceNodes[i][SERVERS].GetN (); j++)   //Servers
-          {
-            listPosAllocator->Add (Vector (200, (start + 25 * j), 0));
-          }
-
-        start = start + (25 * j);
-
-        allHosts.Add (sliceNodes[i][ALL_HOSTS]);
-        allServers.Add (sliceNodes[i][SERVERS]);
-      }
-
-
-
-      MobilityHelper mobilityHelper;
-      mobilityHelper.SetMobilityModel ("ns3::ConstantPositionMobilityModel");
-      mobilityHelper.SetPositionAllocator (listPosAllocator);
-      mobilityHelper.Install (NodeContainer (switches, controllerNode, allHosts, allServers));
-
-    }
-
-
 }
 
 // Comparator for slice priorities.
@@ -599,9 +615,7 @@ configureSlices (std::string config)
     }
 
   file.close ();
-
 }
-
 
 void
 configureSwitches ()
@@ -630,14 +644,14 @@ configureSwitches ()
   interSwitchesPorts.push_back (switchDevices.Get (0)->AddSwitchPort (pairDevs.Get (0)));
   interSwitchesPorts.push_back (switchDevices.Get (1)->AddSwitchPort (pairDevs.Get (1)));
 
-  //Tracing
-  if (trace)
-    {
+  // //Tracing
+  // if (trace)
+  //   {
 
-      csmaHelperinterSwitchesPorts.EnablePcap ("SWA", pairDevs.Get (0), true);
-      csmaHelperinterSwitchesPorts.EnablePcap ("SWB-LEFT", pairDevs.Get (1), true);
+  //     csmaHelperinterSwitchesPorts.EnablePcap ("SWA", pairDevs.Get (0), true);
+  //     csmaHelperinterSwitchesPorts.EnablePcap ("SWB-LEFT", pairDevs.Get (1), true);
 
-    }
+  //   }
 
   //Creating the LinkInfo object between SWA - SWB
   Ptr<CsmaChannel> channelSwaSwb = DynamicCast<CsmaChannel> (pairDevs.Get (0)->GetChannel ());
@@ -657,17 +671,70 @@ configureSwitches ()
   of13Helper->InstallController (controllerNode, controllerApp);
   of13Helper->CreateOpenFlowChannels ();
 
-  //Tracing
-  if (trace)
-    {
+  // //Tracing
+  // if (trace)
+  //   {
 
-      csmaHelperinterSwitchesPorts.EnablePcap ("SWB-RIGHT", pairDevs.Get (0), true);
-      csmaHelperinterSwitchesPorts.EnablePcap ("SERVERSW", pairDevs.Get (1), true);
+  //     csmaHelperinterSwitchesPorts.EnablePcap ("SWB-RIGHT", pairDevs.Get (0), true);
+  //     csmaHelperinterSwitchesPorts.EnablePcap ("SERVERSW", pairDevs.Get (1), true);
 
-    }
-
+  //   }
 }
 
+void
+ForceDefaults ()
+{
+  //
+  // Since we are using an external OpenFlow library that expects complete
+  // network packets, we must enable checksum computations.
+  //
+  Config::SetGlobal (
+    "ChecksumEnabled", BooleanValue (true));
+
+  //
+  // Whenever possible, use the full-duplex CSMA channel to improve throughput.
+  // The code will automatically fall back to half-duplex mode for more than
+  // two devices in the same channel.
+  // This implementation is not available in default ns-3 code, and I got it
+  // from https://codereview.appspot.com/187880044/
+  //
+  Config::SetDefault (
+    "ns3::CsmaChannel::FullDuplex", BooleanValue (true));
+
+  //
+  // Customizing the OpenFlow queue type on switch ports.
+  //
+  Config::SetDefault (
+    "ns3::OFSwitch13Port::QueueFactory", StringValue ("ns3::QosQueue"));
+
+  //
+  // Reducing the OpenFlow datapath timeout interval from 100ms to 50ms to
+  // get a more precise token refill operation at meter entries. This change
+  // requires reducing the EWMA alpha attribute at OpenFlow stats calculator
+  // to continue getting consistent average values for 1s interval.
+  //
+  Config::SetDefault (
+    "ns3::OFSwitch13Device::TimeoutInterval", TimeValue (MilliSeconds (50)));
+  Config::SetDefault (
+    "ns3::OFSwitch13StatsCalculator::EwmaAlpha", DoubleValue (0.1));
+
+  //
+  // Enable detailed OpenFlow datapath statistics.
+  //
+  Config::SetDefault (
+    "ns3::OFSwitch13StatsCalculator::FlowTableDetails", BooleanValue (true));
+}
+
+void
+EnableProgress (int interval)
+{
+  if (interval)
+    {
+      int64_t now = Simulator::Now ().ToInteger (Time::S);
+      std::cout << "Current simulation time: +" << now << ".0s" << std::endl;
+      Simulator::Schedule (Seconds (interval), &EnableProgress, interval);
+    }
+}
 
 void
 EnableVerbose (bool enable)
@@ -694,9 +761,18 @@ EnableVerbose (bool enable)
       LogComponentEnable ("Main",                     logLevelAll);
       LogComponentEnable ("Common",                   logLevelAll);
 
-      // Traffic and applications.
+      // Applications
       LogComponentEnable ("UdpPeerApp",               logLevelWarn);
-      LogComponentEnable ("UdpPeerHelper",            logLevelWarnInfo);
+      LogComponentEnable ("UdpPeerHelper",            logLevelWarn);
+
+      // Infrastructure
+      LogComponentEnable ("Controller",               logLevelWarn);
+      LogComponentEnable ("QosQueue",                 logLevelWarn);
+
+      // Metadata
+      LogComponentEnable ("LinkInfo",                 logLevelWarn);
+      LogComponentEnable ("SliceInfo",                logLevelWarn);
+      LogComponentEnable ("SliceTag",                 logLevelWarn);
 
       // OFSwitch13 module components.
       LogComponentEnable ("OFSwitch13Controller",     logLevelWarn);
