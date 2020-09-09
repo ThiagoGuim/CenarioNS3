@@ -174,24 +174,6 @@ private:
   OpMode                m_spareUse;       //!< Spare bit rate sharing mode.
 
   size_t m_numberSlices;
-
-  /** Map saving <IPv4 address / MAC address> */
-  typedef std::map<Ipv4Address, Mac48Address> IpMacMap_t;
-  IpMacMap_t m_arpTable; //!< ARP resolution table.
-
-  /**
-   * \name L2 switching structures
-   */
-  //\{
-  /** L2SwitchingTable: map MacAddress to port */
-  typedef std::map<Mac48Address, uint32_t> L2Table_t;
-
-  /** Map datapathID to L2SwitchingTable */
-  typedef std::map<uint64_t, L2Table_t> DatapathMap_t;
-
-  /** Switching information for all dapataths */
-  DatapathMap_t m_learnedInfo;
-  //\}
 };
 
 } // namespace ns3

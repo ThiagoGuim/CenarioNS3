@@ -23,10 +23,9 @@
 
 #include "controller.h"
 
-NS_LOG_COMPONENT_DEFINE ("Controller");
-
 namespace ns3 {
 
+NS_LOG_COMPONENT_DEFINE ("Controller");
 NS_OBJECT_ENSURE_REGISTERED (Controller);
 
 /********** Public methods ***********/
@@ -52,7 +51,6 @@ Controller::GetTypeId (void)
                    DataRateValue (DataRate ("12Mbps")),
                    MakeDataRateAccessor (&Controller::m_extraStep),
                    MakeDataRateChecker ())
-
     .AddAttribute ("GuardStep",
                    "Link guard bit rate.",
                    DataRateValue (DataRate ("10Mbps")),
@@ -101,7 +99,6 @@ Controller::DoDispose ()
 {
   NS_LOG_FUNCTION (this);
 
-  m_learnedInfo.clear ();
   OFSwitch13Controller::DoDispose ();
 }
 
@@ -127,26 +124,6 @@ Controller::HandleFlowRemoved (
   uint32_t xid)
 {
   NS_LOG_FUNCTION (this << swtch << xid);
-
-  // Get the switch datapath ID
-  uint64_t swDpId = swtch->GetDpId ();
-
-  NS_LOG_DEBUG ( "Flow entry expired. Removing from L2 switch table.");
-  auto it = m_learnedInfo.find (swDpId);
-  if (it != m_learnedInfo.end ())
-    {
-      Mac48Address mac48;
-      struct ofl_match_tlv *ethSrc =
-        oxm_match_lookup (OXM_OF_ETH_DST, (struct ofl_match*)msg->stats->match);
-      mac48.CopyFrom (ethSrc->value);
-
-      L2Table_t *l2Table = &it->second;
-      auto itSrc = l2Table->find (mac48);
-      if (itSrc != l2Table->end ())
-        {
-          l2Table->erase (itSrc);
-        }
-    }
 
   // All handlers must free the message when everything is ok
   ofl_msg_free_flow_removed (msg, true, 0);
@@ -196,15 +173,6 @@ Controller::HandshakeSuccessful (
   // each packet sent to the controller when not using an output action to the
   // OFPP_CONTROLLER logical port.
   DpctlExecute (swDpId, "set-config miss=128");
-
-  // Create an empty L2SwitchingTable and insert it into m_learnedInfo
-  L2Table_t l2Table;
-  std::pair<uint64_t, L2Table_t> entry (swDpId, l2Table);
-  auto ret = m_learnedInfo.insert (entry);
-  if (ret.second == false)
-    {
-      NS_LOG_ERROR ("Table exists for this datapath.");
-    }
 }
 
 
