@@ -16,6 +16,7 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *
  * Author: Thiago Guimarães <thiago.guimaraes@ice.ufjf.br>
+ *         Luciano Chaves <luciano.chaves@ice.ufjf.br>
  */
 
 #ifndef COMMON_H

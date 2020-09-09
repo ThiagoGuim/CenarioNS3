@@ -1,5 +1,7 @@
-/* -*- Mode:C++; c-file-style:"gnu"; indent-tabs-mode:nil; -*- */
+/* -*-  Mode: C++; c-file-style: "gnu"; indent-tabs-mode:nil; -*- */
 /*
+ * Copyright (c) 2020 Federal University of Juiz de Fora (UFJF)
+ *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
  * published by the Free Software Foundation;
@@ -13,7 +15,8 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *
- * Author: Luciano Chaves <luciano@lrc.ic.unicamp.br>
+ * Author: Thiago Guimarães <thiago.guimaraes@ice.ufjf.br>
+ *         Luciano Chaves <luciano.chaves@ice.ufjf.br>
  */
 
 #ifndef CONTROLLER_H
@@ -99,7 +102,7 @@ public:
 
   /**
    * Install the meters for each slice into Meter Table.
-   * 
+   *
    * \param sliceQuotas Vector that contains the slice quotas.
    * \return void.
    */
@@ -161,7 +164,7 @@ protected:
   void HandshakeSuccessful (Ptr<const RemoteSwitch> swtch);
 
 private:
-  
+
 
   DataRate              m_extraStep;      //!< Extra adjustment step.
   DataRate              m_guardStep;      //!< Dynamic slice link guard.
