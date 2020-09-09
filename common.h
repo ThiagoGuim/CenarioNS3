@@ -9,26 +9,16 @@ namespace ns3 {
 /** Constants that represent the indexes in the vectors. */
 typedef enum
 {
-  HOSTS_SWA = 0,    //!< Index that represent the hosts of switch SWA inside de vectors.
-  HOSTS_SWB = 1,    //!< Index that represent the hosts of switch SWB inside de vectors.
-  SERVERS = 2,      //!< Index that represent the servers inside de vectors.
-  ALL_HOSTS = 3     //!< Index that represent all the hosts (SWA+SWB) inside de vectors.
-}Indexes; 
+  HOSTS_SWA = 0,    //!< The hosts of switch SWA inside de vectors.
+  HOSTS_SWB = 1,    //!< The hosts of switch SWB inside de vectors.
+  SERVERS   = 2,    //!< The servers inside de vectors.
+  ALL_HOSTS = 3     //!< All the hosts (SWA+SWB) inside de vectors.
+} Indexes;
 
-/** EWMA period of evaluation. */
-enum EwmaTerm
-{
-  // Don't change the order. Enum values are used as array indexes.
-  STERM = 0,    //!< Short-term EWMA evaluation.
-  LTERM = 1     //!< Long-term EWMA evaluation.
-};
-
-// Total number of valid EwmaTerm items + 1.
-  #define N_EWMA_TERMS (static_cast<int> (EwmaTerm::LTERM) + 1)
-
-// Total number of valid Slices.
-  #define SLICE_ALL 15
-  #define SLICE_UNKN 16
+// Valid number of slices and IDs
+#define N_MAX_SLICES  14    //!< Slice IDs ranging from 1 to 14
+#define SLICE_UNKN    0
+#define SLICE_ALL     (N_MAX_SLICES + 1)
 
 /**
 \ingroup svelte

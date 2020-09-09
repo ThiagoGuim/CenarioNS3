@@ -23,7 +23,6 @@
 #include "link-info.h"
 #include "slice-tag.h"
 
-
 using namespace std;
 
 #undef NS_LOG_APPEND_CONTEXT
@@ -73,14 +72,14 @@ LinkInfo::LinkInfo (Ptr<OFSwitch13Port> port1, Ptr<OFSwitch13Port> port2,
     "PhyTxEnd", "Backward", MakeCallback (&LinkInfo::NotifyTxPacket, this));
 
   // Clear slice metadata.
-  memset (m_slices, 0, sizeof (SliceMetadata) * N_LINK_DIRS * (SLICE_UNKN + 1));
+  memset (m_slices, 0, sizeof (SliceMetadata) * N_LINK_DIRS * (SLICE_ALL + 1));
 
   // The unknown slice quota represents the bandwidth that was not assigned to
   // any other slice. This bandwidth can be available for use or not, depending
   // on the backhaul controller configuration. The initial quota is set to 100,
   // and the UpdateQuota method will adjust this value.
-  m_slices [LinkDir::FWD][SLICE_UNKN].m_quota = 100;
-  m_slices [LinkDir::BWD][SLICE_UNKN].m_quota = 100;
+  m_slices [LinkDir::FWD][SLICE_UNKN].quota = 100;
+  m_slices [LinkDir::BWD][SLICE_UNKN].quota = 100;
 
   RegisterLinkInfo (Ptr<LinkInfo> (this));
 }
@@ -99,15 +98,10 @@ LinkInfo::GetTypeId (void)
     // For sufficiently large N, the first N data points represent about 86%
     // of the total weight in the calculation when EWMA alpha = 2 / (N + 1).
     //
-    .AddAttribute ("EwmaLongAlpha",
-                   "The EWMA alpha parameter for long-term link throughput.",
-                   DoubleValue (0.01),  // Last 20 seconds (N ~= 200)
-                   MakeDoubleAccessor (&LinkInfo::m_ewmaLtAlpha),
-                   MakeDoubleChecker<double> (0.0, 1.0))
-    .AddAttribute ("EwmaShortAlpha",
-                   "The EWMA alpha parameter for short-term link throughput.",
+    .AddAttribute ("EwmaAlpha",
+                   "The EWMA alpha parameter for link throughput.",
                    DoubleValue (0.2),   // Last 1 second (N ~= 10)
-                   MakeDoubleAccessor (&LinkInfo::m_ewmaStAlpha),
+                   MakeDoubleAccessor (&LinkInfo::m_ewmaAlpha),
                    MakeDoubleChecker<double> (0.0, 1.0))
     .AddAttribute ("EwmaTimeout",
                    "The interval between subsequent EWMA statistics update.",
@@ -189,117 +183,111 @@ LinkInfo::GetLinkBitRate (void) const
 }
 
 int
-LinkInfo::GetQuota (LinkDir dir, int sliceId) const
+LinkInfo::GetQuota (LinkDir dir, int slice) const
 {
-  NS_LOG_FUNCTION (this << dir << sliceId);
+  NS_LOG_FUNCTION (this << dir << slice);
 
-  return m_slices [dir][sliceId].m_quota;
+  return m_slices [dir][slice].quota;
 }
 
 int64_t
-LinkInfo::GetQuoBitRate (LinkDir dir, int sliceId) const
+LinkInfo::GetQuoBitRate (LinkDir dir, int slice) const
 {
-  NS_LOG_FUNCTION (this << dir << sliceId);
+  NS_LOG_FUNCTION (this << dir << slice);
 
-  return GetLinkBitRate () * GetQuota (dir, sliceId) / 100;
+  return GetLinkBitRate () * GetQuota (dir, slice) / 100;
 }
 
 int64_t
-LinkInfo::GetMaxBitRate (LinkDir dir, int sliceId) const
+LinkInfo::GetMaxBitRate (LinkDir dir, int slice) const
 {
-  NS_LOG_FUNCTION (this << dir << sliceId);
+  NS_LOG_FUNCTION (this << dir << slice);
 
-  return GetQuoBitRate (dir, sliceId) + GetExtBitRate (dir, sliceId);
+  return GetQuoBitRate (dir, slice) + GetExtBitRate (dir, slice);
 }
 
 int64_t
-LinkInfo::GetResBitRate (LinkDir dir, int sliceId) const
+LinkInfo::GetResBitRate (LinkDir dir, int slice) const
 {
-  NS_LOG_FUNCTION (this << dir << sliceId);
+  NS_LOG_FUNCTION (this << dir << slice);
 
-  return m_slices [dir][sliceId].m_reserved;
+  return m_slices [dir][slice].reserved;
 }
 
 int64_t
-LinkInfo::GetUnrBitRate (LinkDir dir, int sliceId) const
+LinkInfo::GetUnrBitRate (LinkDir dir, int slice) const
 {
-  NS_LOG_FUNCTION (this << dir << sliceId);
+  NS_LOG_FUNCTION (this << dir << slice);
 
-  return GetMaxBitRate (dir, sliceId) - GetResBitRate (dir, sliceId);
+  return GetMaxBitRate (dir, slice) - GetResBitRate (dir, slice);
 }
 
 int64_t
-LinkInfo::GetUseBitRate (EwmaTerm term, LinkDir dir, int sliceId,
-                         QosType type) const
+LinkInfo::GetUseBitRate (LinkDir dir, int slice, QosType type) const
 {
-  NS_LOG_FUNCTION (this << term << dir << sliceId << type);
+  NS_LOG_FUNCTION (this << dir << slice << type);
 
-  NS_ASSERT_MSG (sliceId <= SLICE_ALL, "Invalid slice for this operation.");
-  return m_slices [dir][sliceId].ewmaThp [type][term];
+  NS_ASSERT_MSG (slice <= SLICE_ALL, "Invalid slice for this operation.");
+  return m_slices [dir][slice].ewmaThp [type];
 }
 
 int64_t
-LinkInfo::GetIdlBitRate (EwmaTerm term, LinkDir dir, int sliceId) const
+LinkInfo::GetIdlBitRate (LinkDir dir, int slice) const
 {
-  NS_LOG_FUNCTION (this << term << dir << sliceId);
+  NS_LOG_FUNCTION (this << dir << slice);
 
-  NS_ASSERT_MSG (sliceId <= SLICE_ALL, "Invalid slice for this operation.");
+  NS_ASSERT_MSG (slice <= SLICE_ALL, "Invalid slice for this operation.");
   return std::max (static_cast<int64_t> (0),
-                   GetMaxBitRate (dir, sliceId) -
-                   GetUseBitRate (term, dir, sliceId, QosType::BOTH));
+                   GetMaxBitRate (dir, slice) -
+                   GetUseBitRate (dir, slice, QosType::BOTH));
 }
 
 int64_t
-LinkInfo::GetOveBitRate (EwmaTerm term, LinkDir dir, int sliceId) const
+LinkInfo::GetOveBitRate (LinkDir dir, int slice) const
 {
-  NS_LOG_FUNCTION (this << term << dir << sliceId);
+  NS_LOG_FUNCTION (this << dir << slice);
 
-  NS_ASSERT_MSG (sliceId <= SLICE_ALL, "Invalid slice for this operation.");
+  NS_ASSERT_MSG (slice <= SLICE_ALL, "Invalid slice for this operation.");
   return std::max (static_cast<int64_t> (0),
-                   GetUseBitRate (term, dir, sliceId, QosType::BOTH) -
-                   GetQuoBitRate (dir, sliceId));
+                   GetUseBitRate (dir, slice, QosType::BOTH) -
+                   GetQuoBitRate (dir, slice));
 }
 
 int64_t
-LinkInfo::GetExtBitRate (LinkDir dir, int sliceId) const
+LinkInfo::GetExtBitRate (LinkDir dir, int slice) const
 {
-  NS_LOG_FUNCTION (this << dir << sliceId);
+  NS_LOG_FUNCTION (this << dir << slice);
 
-  return m_slices [dir][sliceId].m_extra;
+  return m_slices [dir][slice].extra;
 }
 
 int64_t
-LinkInfo::GetMetBitRate (LinkDir dir, int sliceId) const
+LinkInfo::GetMetBitRate (LinkDir dir, int slice) const
 {
-  NS_LOG_FUNCTION (this << dir << sliceId);
+  NS_LOG_FUNCTION (this << dir << slice);
 
-  return m_slices [dir][sliceId].m_meter;
+  return m_slices [dir][slice].meter;
 }
 
 bool
-LinkInfo::HasBitRate (LinkDir dir, int sliceId, int64_t bitRate,
+LinkInfo::HasBitRate (LinkDir dir, int slice, int64_t bitRate,
                       double blockThs) const
 {
-  NS_LOG_FUNCTION (this << dir << sliceId << bitRate << blockThs);
+  NS_LOG_FUNCTION (this << dir << slice << bitRate << blockThs);
 
   // Can't reserve more bit rate than the minimum between the slice
   // quota bit rate and the slice maximum bit rate * block threshold.
-  NS_ASSERT_MSG (sliceId < SLICE_ALL, "Invalid slice for this operation.");
-  int64_t blkBitRate = GetMaxBitRate (dir, sliceId) * blockThs;
-  int64_t quoBitRate = GetQuoBitRate (dir, sliceId);
-  int64_t resBitRate = GetResBitRate (dir, sliceId);
+  NS_ASSERT_MSG (slice < SLICE_ALL, "Invalid slice for this operation.");
+  int64_t blkBitRate = GetMaxBitRate (dir, slice) * blockThs;
+  int64_t quoBitRate = GetQuoBitRate (dir, slice);
+  int64_t resBitRate = GetResBitRate (dir, slice);
   return (resBitRate + bitRate <= std::min (blkBitRate, quoBitRate));
 }
 
 std::ostream &
-LinkInfo::PrintValues (std::ostream &os, LinkDir dir, int sliceId) const
+LinkInfo::PrintValues (std::ostream &os, LinkDir dir, int slice) const
 {
   NS_LOG_FUNCTION (this);
-
-  #define ST EwmaTerm::STERM
-  #define LT EwmaTerm::LTERM
-  #define NT QosType::NON
-  #define GT QosType::GBR
 
   std::string linkDescStr;
   linkDescStr += std::to_string (GetSwDpId (0));
@@ -308,21 +296,17 @@ LinkInfo::PrintValues (std::ostream &os, LinkDir dir, int sliceId) const
 
   os << " " << setw (9)  << linkDescStr
      << " " << setw (11) << Bps2Kbps (GetLinkBitRate ())
-     << " " << setw (8)  << GetQuota (dir, sliceId)
-     << " " << setw (11) << Bps2Kbps (GetQuoBitRate (dir, sliceId))
-     << " " << setw (11) << Bps2Kbps (GetExtBitRate (dir, sliceId))
-     << " " << setw (11) << Bps2Kbps (GetMaxBitRate (dir, sliceId))
-     << " " << setw (11) << Bps2Kbps (GetResBitRate (dir, sliceId))
-     << " " << setw (11) << Bps2Kbps (GetUnrBitRate (dir, sliceId))
-     << " " << setw (11) << Bps2Kbps (GetMetBitRate (dir, sliceId))
-     << " " << setw (11) << Bps2Kbps (GetUseBitRate (ST, dir, sliceId, GT))
-     << " " << setw (11) << Bps2Kbps (GetUseBitRate (ST, dir, sliceId, NT))
-     << " " << setw (11) << Bps2Kbps (GetOveBitRate (ST, dir, sliceId))
-     << " " << setw (11) << Bps2Kbps (GetIdlBitRate (ST, dir, sliceId))
-     << " " << setw (11) << Bps2Kbps (GetUseBitRate (LT, dir, sliceId, GT))
-     << " " << setw (11) << Bps2Kbps (GetUseBitRate (LT, dir, sliceId, NT))
-     << " " << setw (11) << Bps2Kbps (GetOveBitRate (LT, dir, sliceId))
-     << " " << setw (11) << Bps2Kbps (GetIdlBitRate (LT, dir, sliceId));
+     << " " << setw (8)  << GetQuota (dir, slice)
+     << " " << setw (11) << Bps2Kbps (GetQuoBitRate (dir, slice))
+     << " " << setw (11) << Bps2Kbps (GetExtBitRate (dir, slice))
+     << " " << setw (11) << Bps2Kbps (GetMaxBitRate (dir, slice))
+     << " " << setw (11) << Bps2Kbps (GetResBitRate (dir, slice))
+     << " " << setw (11) << Bps2Kbps (GetUnrBitRate (dir, slice))
+     << " " << setw (11) << Bps2Kbps (GetMetBitRate (dir, slice))
+     << " " << setw (11) << Bps2Kbps (GetUseBitRate (dir, slice, QosType::GBR))
+     << " " << setw (11) << Bps2Kbps (GetUseBitRate (dir, slice, QosType::NON))
+     << " " << setw (11) << Bps2Kbps (GetOveBitRate (dir, slice))
+     << " " << setw (11) << Bps2Kbps (GetIdlBitRate (dir, slice));
   return os;
 }
 
@@ -380,14 +364,10 @@ LinkInfo::PrintHeader (std::ostream &os)
      << " " << setw (11) << "ResKpbs"
      << " " << setw (11) << "UnrKbps"
      << " " << setw (11) << "MetKbps"
-     << " " << setw (11) << "UseGbrSt"
-     << " " << setw (11) << "UseNonSt"
-     << " " << setw (11) << "OverSt"
-     << " " << setw (11) << "IdleSt"
-     << " " << setw (11) << "UseGbrLt"
-     << " " << setw (11) << "UseNonLt"
-     << " " << setw (11) << "OverLt"
-     << " " << setw (11) << "IdleLt";
+     << " " << setw (11) << "UseGbrKbps"
+     << " " << setw (11) << "UseNonKbps"
+     << " " << setw (11) << "OverKbps"
+     << " " << setw (11) << "IdleKbps";
   return os;
 }
 
@@ -427,11 +407,10 @@ LinkInfo::NotifyTxPacket (std::string context, Ptr<const Packet> packet)
   if (packet->PeekPacketTag (tag))
     {
       uint8_t slice = tag.GetSliceId ();
-      QosType type = QosType::NON;
+      QosType type = QosType::NON; // FIXME
       uint32_t size = packet->GetSize ();
 
-      // Update TX packets for the traffic slice and for fake shared slice,
-      // considering both the traffic type and the fake both type.
+      // Update TX packets.
       m_slices [dir][slice].txBytes [type] += size;
       m_slices [dir][slice].txBytes [QosType::BOTH] += size;
       m_slices [dir][SLICE_ALL].txBytes [type] += size;
@@ -444,15 +423,15 @@ LinkInfo::NotifyTxPacket (std::string context, Ptr<const Packet> packet)
 }
 
 bool
-LinkInfo::UpdateQuota (LinkDir dir, int sliceId, int quota)
+LinkInfo::UpdateQuota (LinkDir dir, int slice, int quota)
 {
-  NS_LOG_FUNCTION (this << dir << sliceId << quota);
+  NS_LOG_FUNCTION (this << dir << slice << quota);
 
   // Check for valid slice quota.
-  NS_ASSERT_MSG (sliceId < SLICE_ALL, "Invalid slice for this operation.");
-  int newSliQuota = GetQuota (dir, sliceId) + quota;
+  NS_ASSERT_MSG (slice < SLICE_ALL, "Invalid slice for this operation.");
+  int newSliQuota = GetQuota (dir, slice) + quota;
   int newAllQuota = GetQuota (dir, SLICE_ALL) + quota;
-  if ((GetResBitRate (dir, sliceId) > ((GetLinkBitRate () * newSliQuota) / 100))
+  if ((GetResBitRate (dir, slice) > ((GetLinkBitRate () * newSliQuota) / 100))
       || (newSliQuota < 0 || newSliQuota > 100)
       || (newAllQuota < 0 || newAllQuota > 100))
     {
@@ -461,47 +440,47 @@ LinkInfo::UpdateQuota (LinkDir dir, int sliceId, int quota)
     }
 
   // Update the slice quota.
-  m_slices [dir][sliceId].m_quota += quota;
-  m_slices [dir][SLICE_ALL].m_quota += quota;
-  m_slices [dir][SLICE_UNKN].m_quota -= quota;
-  //NS_LOG_DEBUG ("Slice " << SliceIdStr (sliceId) <<
-  //" with new quota " << GetQuota (dir, sliceId) <<
-  //" in " << LinkDirStr (dir) << " direction.");
+  m_slices [dir][slice].quota += quota;
+  m_slices [dir][SLICE_ALL].quota += quota;
+  m_slices [dir][SLICE_UNKN].quota -= quota;
+  NS_LOG_DEBUG ("Slice id " << slice <<
+                " with new quota " << GetQuota (dir, slice) <<
+                " in " << LinkDirStr (dir) << " direction.");
   return true;
 }
 
 bool
 LinkInfo::UpdateResBitRate (
-  LinkDir dir, int sliceId, int64_t bitRate)
+  LinkDir dir, int slice, int64_t bitRate)
 {
-  NS_LOG_FUNCTION (this << dir << sliceId << bitRate);
+  NS_LOG_FUNCTION (this << dir << slice << bitRate);
 
   // Check for valid slice reserved bit rate.
-  NS_ASSERT_MSG (sliceId < SLICE_ALL, "Invalid slice for this operation.");
-  int64_t newSliReserved = GetResBitRate (dir, sliceId) + bitRate;
-  if (newSliReserved < 0 || newSliReserved > GetQuoBitRate (dir, sliceId))
+  NS_ASSERT_MSG (slice < SLICE_ALL, "Invalid slice for this operation.");
+  int64_t newSliReserved = GetResBitRate (dir, slice) + bitRate;
+  if (newSliReserved < 0 || newSliReserved > GetQuoBitRate (dir, slice))
     {
       NS_LOG_WARN ("Can't change the slice reserved bit rate.");
       return false;
     }
 
   // Reserving the bit rate.
-  m_slices [dir][sliceId].m_reserved += bitRate;
-  m_slices [dir][SLICE_ALL].m_reserved += bitRate;
-  //NS_LOG_DEBUG ("Slice " << SliceIdStr (sliceId) <<
-  //" with new reserved bit rate " << GetResBitRate (dir, sliceId) <<
-  //" in " << LinkDirStr (dir) << " direction.");
+  m_slices [dir][slice].reserved += bitRate;
+  m_slices [dir][SLICE_ALL].reserved += bitRate;
+  NS_LOG_DEBUG ("Slice id " << slice <<
+                " with new reserved bit rate " << GetResBitRate (dir, slice) <<
+                " in " << LinkDirStr (dir) << " direction.");
   return true;
 }
 
 bool
-LinkInfo::UpdateExtBitRate (LinkDir dir, int sliceId, int64_t bitRate)
+LinkInfo::UpdateExtBitRate (LinkDir dir, int slice, int64_t bitRate)
 {
-  NS_LOG_FUNCTION (this << dir << sliceId << bitRate);
+  NS_LOG_FUNCTION (this << dir << slice << bitRate);
 
   // Check for valid slice extra bit rate.
-  NS_ASSERT_MSG (sliceId < SLICE_ALL, "Invalid slice for this operation.");
-  int64_t newSliExtra = GetExtBitRate (dir, sliceId) + bitRate;
+  NS_ASSERT_MSG (slice < SLICE_ALL, "Invalid slice for this operation.");
+  int64_t newSliExtra = GetExtBitRate (dir, slice) + bitRate;
   int64_t newAllExtra = GetExtBitRate (dir, SLICE_ALL) + bitRate;
   if ((newSliExtra < 0) || (newAllExtra < 0))
     {
@@ -510,21 +489,21 @@ LinkInfo::UpdateExtBitRate (LinkDir dir, int sliceId, int64_t bitRate)
     }
 
   // Update the slice extra bit rate.
-  m_slices [dir][sliceId].m_extra += bitRate;
-  m_slices [dir][SLICE_ALL].m_extra += bitRate;
-  //NS_LOG_DEBUG ("Slice " << SliceIdStr (sliceId) <<
-  //" with new extra bit rate " << GetExtBitRate (dir, sliceId) <<
-  //" in " << LinkDirStr (dir) << " direction.");
+  m_slices [dir][slice].extra += bitRate;
+  m_slices [dir][SLICE_ALL].extra += bitRate;
+  NS_LOG_DEBUG ("Slice id " << slice <<
+                " with new extra bit rate " << GetExtBitRate (dir, slice) <<
+                " in " << LinkDirStr (dir) << " direction.");
   return true;
 }
 
 bool
-LinkInfo::SetMetBitRate (LinkDir dir, int sliceId, int64_t bitRate)
+LinkInfo::SetMetBitRate (LinkDir dir, int slice, int64_t bitRate)
 {
-  NS_LOG_FUNCTION (this << dir << sliceId << bitRate);
+  NS_LOG_FUNCTION (this << dir << slice << bitRate);
 
   // Check for valid slice meter bit rate.
-  NS_ASSERT_MSG (sliceId <= SLICE_ALL, "Invalid slice for this operation.");
+  NS_ASSERT_MSG (slice <= SLICE_ALL, "Invalid slice for this operation.");
   if (bitRate < 0)
     {
       NS_LOG_WARN ("Can't set the slice meter bit rate.");
@@ -532,10 +511,10 @@ LinkInfo::SetMetBitRate (LinkDir dir, int sliceId, int64_t bitRate)
     }
 
   // Set the slice meter bit rate.
-  m_slices [dir][sliceId].m_meter = bitRate;
-  //NS_LOG_DEBUG ("Slice " << SliceIdStr (sliceId) <<
-  //" with new meter bit rate " << GetMetBitRate (dir, sliceId) <<
-  // " in " << LinkDirStr (dir) << " direction.");
+  m_slices [dir][slice].meter = bitRate;
+  NS_LOG_DEBUG ("Slice id " << slice <<
+                " with new meter bit rate " << GetMetBitRate (dir, slice) <<
+                " in " << LinkDirStr (dir) << " direction.");
   return true;
 }
 
@@ -543,20 +522,16 @@ void
 LinkInfo::EwmaUpdate (void)
 {
   double elapSecs = (Simulator::Now () - m_ewmaLastTime).GetSeconds ();
-  for (int s = 0; s < SLICE_UNKN; s++)
+  for (int s = 0; s <= SLICE_ALL; s++)
     {
       for (int d = 0; d < N_LINK_DIRS; d++)
         {
           SliceMetadata &slData = m_slices [d][s];
           for (int t = 0; t < N_QOS_TYPES_BOTH; t++)
             {
-              // Updating both long-term and short-term EWMA throughput.
-              slData.ewmaThp [t][EwmaTerm::LTERM] =
-                (m_ewmaLtAlpha * 8 * slData.txBytes [t]) / elapSecs +
-                (1 - m_ewmaLtAlpha) * slData.ewmaThp [t][EwmaTerm::LTERM];
-              slData.ewmaThp [t][EwmaTerm::STERM] =
-                (m_ewmaStAlpha * 8 * slData.txBytes [t]) / elapSecs +
-                (1 - m_ewmaStAlpha) * slData.ewmaThp [t][EwmaTerm::STERM];
+              // Updating EWMA throughput.
+              slData.ewmaThp [t] = ((1 - m_ewmaAlpha) * slData.ewmaThp [t]) +
+                ((m_ewmaAlpha * 8 * slData.txBytes [t]) / elapSecs);
               slData.txBytes [t] = 0;
             }
         }

@@ -39,17 +39,16 @@ typedef std::set<Ptr<LinkInfo> > LinkInfoSet_t;
 
 /**
  * \ingroup svelteInfra
- * Metadata associated to a link between two OpenFlow backhaul switches.
+ * Metadata associated to a link between two OpenFlow switches.
  *
  * The link is prepared to handle inter-slicing, and each slice has the
  * following metadata information associated to it:
- * - The slice quota, updated by the backhaul controller;
- * - The extra (over quota) bit rate, updated by the backhaul controller;
- * - The meter bit rate, updated by the backhaul controller;
- * - The reserved bit rate, updated by the backhaul controller;
+ * - The slice quota, updated by the controller;
+ * - The extra (over quota) bit rate, updated by the controller;
+ * - The meter bit rate, updated by the controller;
+ * - The reserved bit rate, updated by the controller;
  * - The transmitted bytes, updated by NotifyTxPacket method;
- * - The average throughput, for both short-term and long-term periods of
- *   evaluation, periodically updated by EwmaUpdate method;
+ * - The average throughput, periodically updated by EwmaUpdate method;
  *
  * The figure below shows the relationship among link and slice bit rates:
  * \verbatim
@@ -71,8 +70,7 @@ typedef std::set<Ptr<LinkInfo> > LinkInfoSet_t;
  */
 class LinkInfo : public Object
 {
-  friend class BackhaulController;
-  friend class RingController;
+  friend class Controller;
 
 public:
   /** Link direction. */
@@ -85,9 +83,6 @@ public:
 
   // Total number of valid LinkDir items + 1.
   #define N_LINK_DIRS (static_cast<int> (LinkInfo::BWD) + 1)
-
-
-
 
   /**
    * Complete constructor.
@@ -155,7 +150,7 @@ public:
    * \return The slice quota.
    */
   int GetQuota (
-    LinkDir dir, int sliceId = SLICE_ALL) const;
+    LinkDir dir, int slice = SLICE_ALL) const;
 
   /**
    * Get the quota bit rate for this link on the given direction,
@@ -165,7 +160,7 @@ public:
    * \return The maximum bit rate.
    */
   int64_t GetQuoBitRate (
-    LinkDir dir, int sliceId = SLICE_ALL) const;
+    LinkDir dir, int slice = SLICE_ALL) const;
 
   /**
    * Get the maximum bit rate for this link on the given direction,
@@ -176,7 +171,7 @@ public:
    * \return The reserved bit rate.
    */
   int64_t GetMaxBitRate (
-    LinkDir dir, int sliceId = SLICE_ALL) const;
+    LinkDir dir, int slice = SLICE_ALL) const;
 
   /**
    * Get the reserved bit rate for this link on the given direction,
@@ -186,7 +181,7 @@ public:
    * \return The reserved bit rate.
    */
   int64_t GetResBitRate (
-    LinkDir dir, int sliceId = SLICE_ALL) const;
+    LinkDir dir, int slice = SLICE_ALL) const;
 
   /**
    * Get the unreservedbit rate for this link on the given direction,
@@ -197,42 +192,38 @@ public:
    * \return The available bit rate.
    */
   int64_t GetUnrBitRate (
-    LinkDir dir, int sliceId = SLICE_ALL) const;
+    LinkDir dir, int slice = SLICE_ALL) const;
 
   /**
    * Get the EWMA throughput bit rate for this link on the given direction,
    * optionally filtered by the network slice and QoS traffic type.
-   * \param term The EWMA period of evaluation.
    * \param dir The link direction.
    * \param slice The network slice.
    * \param type Traffic QoS type.
    * \return The EWMA throughput.
    */
   int64_t GetUseBitRate (
-    EwmaTerm term, LinkDir dir, int sliceId = SLICE_ALL,
-    QosType type = QosType::BOTH) const;
+    LinkDir dir, int slice = SLICE_ALL, QosType type = QosType::BOTH) const;
 
   /**
    * Get the EWMA idle (not used) bit rate for this link on the given direction,
    * optionally filtered by the network slice.
-   * \param term The EWMA period of evaluation.
    * \param dir The link direction.
    * \param slice The network slice.
    * \return The EWMA throughput.
    */
   int64_t GetIdlBitRate (
-    EwmaTerm term, LinkDir dir, int sliceId = SLICE_ALL) const;
+    LinkDir dir, int slice = SLICE_ALL) const;
 
   /**
    * Get the EWMA over (after quota) bit rate for this link on the given
    * direction, optionally filtered by the network slice.
-   * \param term The EWMA period of evaluation.
    * \param dir The link direction.
    * \param slice The network slice.
    * \return The EWMA throughput.
    */
   int64_t GetOveBitRate (
-    EwmaTerm term, LinkDir dir, int sliceId = SLICE_ALL) const;
+    LinkDir dir, int slice = SLICE_ALL) const;
 
   /**
    * Get the extra bit rate for this link on the given direction,
@@ -242,7 +233,7 @@ public:
    * \return The extra bit rate.
    */
   int64_t GetExtBitRate (
-    LinkDir dir, int sliceId = SLICE_ALL) const;
+    LinkDir dir, int slice = SLICE_ALL) const;
 
   /**
    * Get the meter bit rate for this link on the given direction,
@@ -252,7 +243,7 @@ public:
    * \return The available bit rate.
    */
   int64_t GetMetBitRate (
-    LinkDir dir, int sliceId = SLICE_ALL) const;
+    LinkDir dir, int slice = SLICE_ALL) const;
 
   /**
    * Check for free (not reserved) bit rate that can be reserved for GBR
@@ -263,8 +254,8 @@ public:
    * \param blockThs The block threshold.
    * \return True if there is available bit rate, false otherwise.
    */
-  bool HasBitRate (LinkDir dir, int sliceId, int64_t bitRate,
-                   double blockThs) const;
+  bool HasBitRate (
+    LinkDir dir, int slice, int64_t bitRate, double blockThs) const;
 
   /**
    * Print the link metadata for a specific link direction and network slice.
@@ -274,8 +265,8 @@ public:
    * \return The output stream.
    * \internal Keep this method consistent with the PrintHeader () method.
    */
-  std::ostream & PrintValues (std::ostream &os, LinkDir dir,
-                              int sliceId) const;
+  std::ostream & PrintValues (
+    std::ostream &os, LinkDir dir, int slice) const;
 
   /**
    * Get the string representing the given direction.
@@ -314,28 +305,6 @@ public:
    */
   static std::ostream & PrintHeader (std::ostream &os);
 
-
-  /**
-   * Set the meter bit rate for this link on the given direction.
-   * \param dir The link direction.
-   * \param slice The network slice.
-   * \param bitRate The value to set.
-   * \return True if succeeded, false otherwise.
-   */
-  bool SetMetBitRate (
-    LinkDir dir, int sliceId, int64_t bitRate);
-
-  /**
-   * Update the slice quota for this link on the given direction.
-   * \param dir The link direction.
-   * \param slice The network slice.
-   * \param quota The value to update.
-   * \return True if succeeded, false otherwise.
-   */
-  bool UpdateQuota (
-    LinkDir dir, int sliceId, int quota);
-
-
 protected:
   /** Destructor implementation. */
   virtual void DoDispose ();
@@ -349,7 +318,18 @@ private:
    * channel. This method will update internal byte counters.
    * \param packet The transmitted packet.
    */
-  void NotifyTxPacket (std::string context, Ptr<const Packet> packet);
+  void NotifyTxPacket (
+    std::string context, Ptr<const Packet> packet);
+
+  /**
+   * Update the slice quota for this link on the given direction.
+   * \param dir The link direction.
+   * \param slice The network slice.
+   * \param quota The value to update.
+   * \return True if succeeded, false otherwise.
+   */
+  bool UpdateQuota (
+    LinkDir dir, int slice, int quota);
 
   /**
    * Update the reserved bit rate for this link on the given direction.
@@ -359,7 +339,7 @@ private:
    * \return True if succeeded, false otherwise.
    */
   bool UpdateResBitRate (
-    LinkDir dir, int sliceId, int64_t bitRate);
+    LinkDir dir, int slice, int64_t bitRate);
 
   /**
    * Update the extra bit rate for this link on the given direction.
@@ -369,9 +349,17 @@ private:
    * \return True if succeeded, false otherwise.
    */
   bool UpdateExtBitRate (
-    LinkDir dir, int sliceId, int64_t bitRate);
+    LinkDir dir, int slice, int64_t bitRate);
 
-
+  /**
+   * Set the meter bit rate for this link on the given direction.
+   * \param dir The link direction.
+   * \param slice The network slice.
+   * \param bitRate The value to set.
+   * \return True if succeeded, false otherwise.
+   */
+  bool SetMetBitRate (
+    LinkDir dir, int slice, int64_t bitRate);
 
   /**
    * Update EWMA average statistics.
@@ -387,27 +375,22 @@ private:
   /** Metadata associated to a network slice. */
   struct SliceMetadata
   {
-    int     m_quota;                      //!< Slice quota (0-100%).
-    int64_t m_extra;                      //!< Extra (over quota) bit rate.
-    int64_t m_meter;                      //!< OpenFlow meter bit rate.
-    int64_t m_reserved;                   //!< Reserved bit rate.
-
-    /** EWMA throughput for both short-term and long-term averages. */
-    int64_t ewmaThp [N_QOS_TYPES_BOTH][N_EWMA_TERMS];
-
-    /** TX byte counters for each LTE QoS type. */
-    int64_t txBytes [N_QOS_TYPES_BOTH];
+    int     quota;                      //!< Slice quota (0-100%).
+    int64_t extra;                      //!< Extra (over quota) bit rate.
+    int64_t meter;                      //!< OpenFlow meter bit rate.
+    int64_t reserved;                   //!< Reserved bit rate.
+    int64_t ewmaThp [N_QOS_TYPES_BOTH]; //!< EWMA throughput.
+    int64_t txBytes [N_QOS_TYPES_BOTH]; //!< TX byte counter.
   };
 
   Ptr<CsmaChannel>      m_channel;              //!< The CSMA link channel.
   Ptr<OFSwitch13Port>   m_ports [2];            //!< OpenFlow ports.
 
   /** Metadata for each network slice in each link direction. */
-  SliceMetadata         m_slices [N_LINK_DIRS][SLICE_UNKN + 1];
+  SliceMetadata         m_slices [N_LINK_DIRS][SLICE_ALL + 1];
 
   // EWMA throughput calculation.
-  double                m_ewmaLtAlpha;          //!< EWMA long-term alpha.
-  double                m_ewmaStAlpha;          //!< EWMA short-term alpha.
+  double                m_ewmaAlpha;            //!< EWMA alpha.
   Time                  m_ewmaTimeout;          //!< EWMA update timeout.
   Time                  m_ewmaLastTime;         //!< Last EWMA update time.
 
