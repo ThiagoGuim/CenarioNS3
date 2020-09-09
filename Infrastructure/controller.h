@@ -28,7 +28,7 @@
 
 #include "../metadata/link-info.h"
 #include "../infrastructure/qos-queue.h"
-#include "../metadata/slice.h"
+#include "../metadata/slice-info.h"
 
 namespace ns3 {
 

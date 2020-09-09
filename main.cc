@@ -34,7 +34,7 @@
 #include <fstream>
 #include "infrastructure/controller.h"
 #include "application/udp-peer-helper.h"
-#include "metadata/slice.h"
+#include "metadata/slice-info.h"
 
 
 using namespace ns3;

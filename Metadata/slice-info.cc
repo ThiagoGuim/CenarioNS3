@@ -19,7 +19,7 @@
  *         Luciano Chaves <luciano.chaves@ice.ufjf.br>
  */
 
-#include "slice.h"
+#include "slice-info.h"
 #include "../common.h"
 
 namespace ns3 {
