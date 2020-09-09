@@ -107,6 +107,12 @@ static ns3::GlobalValue
                   ns3::StringValue (std::string ()),
                   ns3::MakeStringChecker ());
 
+// Flag for error messages at the stderr stream.
+static ns3::GlobalValue
+  g_seeLogs ("SeeCerr", "Tell user to check the stderr stream.",
+             ns3::BooleanValue (false),
+             ns3::MakeBooleanChecker ());
+
 int
 main (int argc, char *argv[])
 {

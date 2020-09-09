@@ -54,26 +54,6 @@ public:
    */
   static TypeId GetTypeId (void);
 
-  /** Destructor implementation */
-  virtual void DoDispose ();
-
-
-
-  /**
-   * Handle flow removed messages sent from switch to this controller. Look for
-   * L2 switching information and removes associated entry.
-   *
-   * \param msg The flow removed message.
-   * \param swtch The switch information.
-   * \param xid Transaction id.
-   * \return 0 if everything's ok, otherwise an error number.
-   */
-  ofl_err HandleFlowRemoved (
-    struct ofl_msg_flow_removed *msg, Ptr<const RemoteSwitch> swtch,
-    uint32_t xid);
-
-
-
   /**
    * Notify the controller that all nodes have been configured
    * such as the ports on the switches.
@@ -82,11 +62,8 @@ public:
    * \param switch_ports The vector that contains the pointer to each port on switches.
    * \return void.
    */
-  void NotifyClientsServers (
-    TopologyIfaces_t sliceInterfaces,
-    TopologyPorts_t switchPorts);
-
-
+  void NotifyClientsServers (TopologyIfaces_t sliceInterfaces,
+                             TopologyPorts_t switchPorts);
 
   /**
    * Notify the controller that all switches have been configured
@@ -96,9 +73,8 @@ public:
    * \param switchDevices Container responsible to store de Devices of each switch.
    * \return void.
    */
-  void
-  NotifySwitches (PortsVector_t interSwitchesPorts,
-                  OFSwitch13DeviceContainer switchDevices);
+  void NotifySwitches (PortsVector_t interSwitchesPorts,
+                       OFSwitch13DeviceContainer switchDevices);
 
   /**
    * Install the meters for each slice into Meter Table.
@@ -106,10 +82,25 @@ public:
    * \param sliceQuotas Vector that contains the slice quotas.
    * \return void.
    */
-  void
-  ConfigureMeters (std::vector<Ptr<Slice>> slices);
+  void ConfigureMeters (std::vector<Ptr<Slice>> slices);
 
-  /**
+protected:
+  /** Destructor implementation */
+  virtual void DoDispose ();
+
+  // Inherited from OFSwitch13Controller.
+  virtual ofl_err HandleError (
+    struct ofl_msg_error *msg, Ptr<const RemoteSwitch> swtch, uint32_t xid);
+  virtual ofl_err HandleFlowRemoved (
+    struct ofl_msg_flow_removed *msg, Ptr<const RemoteSwitch> swtch, uint32_t xid);
+  virtual ofl_err HandlePacketIn (
+    struct ofl_msg_packet_in *msg, Ptr<const RemoteSwitch> swtch, uint32_t xid);
+  virtual void HandshakeSuccessful (
+    Ptr<const RemoteSwitch> swtch);
+  // Inherited from OFSwitch13Controller.
+
+private:
+/**
    * Periodically check for infrastructure bandwidth utilization over backhaul
    * links to adjust extra bit rate when in dynamic inter-slice operation mode.
    */
@@ -122,7 +113,6 @@ public:
    * \param dir The link direction.
    */
   void SlicingExtraAdjust (Ptr<LinkInfo> lInfo, LinkInfo::LinkDir dir);
-
 
   /**
    * Apply the infrastructure inter-slicing OpenFlow meters.
@@ -146,26 +136,9 @@ public:
    */
   void SlicingMeterInstall (Ptr<LinkInfo> lInfo, int sliceId);
 
-  /**
-   * \name Attribute accessors.
-   * \return The requested information.
-   */
-  //\{
-  SliceMode GetInterSliceMode     (void) const;
-  OpMode    GetSpareUseMode       (void) const;
-  //\}
-
   //Poiters to link infos
   Ptr<LinkInfo> m_lInfoA;
   Ptr<LinkInfo> m_lInfoB;
-
-protected:
-  // Inherited from OFSwitch13Controller
-  void HandshakeSuccessful (Ptr<const RemoteSwitch> swtch);
-
-private:
-
-
   DataRate              m_extraStep;      //!< Extra adjustment step.
   DataRate              m_guardStep;      //!< Dynamic slice link guard.
   DataRate              m_meterStep;      //!< Meter adjustment step.

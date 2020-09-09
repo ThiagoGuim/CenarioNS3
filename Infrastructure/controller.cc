@@ -94,86 +94,7 @@ Controller::GetTypeId (void)
   return tid;
 }
 
-void
-Controller::DoDispose ()
-{
-  NS_LOG_FUNCTION (this);
 
-  OFSwitch13Controller::DoDispose ();
-}
-
-SliceMode
-Controller::GetInterSliceMode (void) const
-{
-  NS_LOG_FUNCTION (this);
-
-  return m_sliceMode;
-}
-
-OpMode
-Controller::GetSpareUseMode (void) const
-{
-  NS_LOG_FUNCTION (this);
-
-  return m_spareUse;
-}
-
-ofl_err
-Controller::HandleFlowRemoved (
-  struct ofl_msg_flow_removed *msg, Ptr<const RemoteSwitch> swtch,
-  uint32_t xid)
-{
-  NS_LOG_FUNCTION (this << swtch << xid);
-
-  // All handlers must free the message when everything is ok
-  ofl_msg_free_flow_removed (msg, true, 0);
-  return 0;
-}
-
-/********** Private methods **********/
-void
-Controller::HandshakeSuccessful (
-  Ptr<const RemoteSwitch> swtch)
-{
-  NS_LOG_FUNCTION (this << swtch);
-
-  // Get the switch datapath ID
-  uint64_t swDpId = swtch->GetDpId ();
-
-  // After a successfull handshake, let's install the table-miss entry, setting
-  // to 128 bytes the maximum amount of data from a packet that should be sent
-  // to the controller.
-  DpctlExecute (swDpId, "flow-mod cmd=add,table=0,prio=0 apply:output=ctrl:128");
-
-  //Flooding all ARP packets
-  DpctlExecute (swDpId, "flow-mod cmd=add,table=0,prio=10 eth_type=0x0806 apply:output=flood");
-
-  //Standard table 1 Rule
-  DpctlExecute (swDpId, "flow-mod cmd=add,table=1,prio=0 goto:2");
-
-  //Standard table 2 Rule
-  DpctlExecute (swDpId, "flow-mod cmd=add,table=2,prio=0 ");
-
-
-  //QoS output queues rules.
-  for (auto const &it : Dscp2QueueMap ())
-    {
-      std::ostringstream cmd;
-      cmd << "flow-mod cmd=add,prio=32"
-          << ",table="        << OFS_TAB_QUEUE
-          << ",flags="        << FLAGS_REMOVED_OVERLAP_RESET
-          << " eth_type="     << IPV4_PROT_NUM
-          << ",ip_dscp="      << static_cast<uint16_t> (it.first)
-          << " write:queue="  << static_cast<uint32_t> (it.second);
-      DpctlExecute (swDpId, cmd.str ());
-    }
-
-
-  // Configure te switch to buffer packets and send only the first 128 bytes of
-  // each packet sent to the controller when not using an output action to the
-  // OFPP_CONTROLLER logical port.
-  DpctlExecute (swDpId, "set-config miss=128");
-}
 
 
 void
@@ -221,7 +142,7 @@ Controller::NotifySwitches (PortsVector_t interSwitchesPorts,
 {
 
 
-  //Installing the fowarding rules between switches.
+  // Installing the fowarding rules between switches.
 
   //SWA
   std::ostringstream cmd;
@@ -290,7 +211,7 @@ Controller::ConfigureMeters (std::vector<Ptr<Slice>> slices)
   // Meter table
   //
   // Install inter-slicing meters, depending on the InterSliceMode attribute.
-  switch (GetInterSliceMode ())
+  switch (m_sliceMode)
     {
     case SliceMode::NONE:
       // Nothing to do when inter-slicing is disabled.
@@ -335,6 +256,118 @@ Controller::ConfigureMeters (std::vector<Ptr<Slice>> slices)
 
 }
 
+
+/********** Protected methods **********/
+
+void
+Controller::DoDispose ()
+{
+  NS_LOG_FUNCTION (this);
+
+  OFSwitch13Controller::DoDispose ();
+}
+
+ofl_err
+Controller::HandleError (
+  struct ofl_msg_error *msg, Ptr<const RemoteSwitch> swtch, uint32_t xid)
+{
+  NS_LOG_FUNCTION (this << swtch << xid);
+
+  // Print the message.
+  char *cStr = ofl_msg_to_string ((struct ofl_msg_header*)msg, 0);
+  std::string msgStr (cStr);
+  free (cStr);
+
+  // All handlers must free the message when everything is ok.
+  ofl_msg_free ((struct ofl_msg_header*)msg, 0);
+
+  // Logging this error message on the standard error stream and continue.
+  Config::SetGlobal ("SeeCerr", BooleanValue (true));
+  std::cerr << Simulator::Now ().GetSeconds ()
+            << " Controller received message xid " << xid
+            << " from switch id " << swtch->GetDpId ()
+            << " with error message: " << msgStr
+            << std::endl;
+  return 0;
+}
+
+ofl_err
+Controller::HandleFlowRemoved (
+  struct ofl_msg_flow_removed *msg, Ptr<const RemoteSwitch> swtch, uint32_t xid)
+{
+  NS_LOG_FUNCTION (this << swtch << xid);
+
+  // Print the message.
+  char *cStr = ofl_msg_to_string ((struct ofl_msg_header*)msg, 0);
+  std::string msgStr (cStr);
+  free (cStr);
+
+  // All handlers must free the message when everything is ok
+  ofl_msg_free_flow_removed (msg, true, 0);
+  return 0;
+}
+
+ofl_err
+Controller::HandlePacketIn (
+  struct ofl_msg_packet_in *msg, Ptr<const RemoteSwitch> swtch, uint32_t xid)
+{
+  NS_LOG_FUNCTION (this << swtch << xid);
+
+  // Print the message.
+  char *cStr = ofl_structs_match_to_string (msg->match, 0);
+  std::string msgStr (cStr);
+  free (cStr);
+
+  // All handlers must free the message when everything is ok.
+  ofl_msg_free ((struct ofl_msg_header*)msg, 0);
+
+  // Logging this packet-in message on the standard error stream and continue.
+  Config::SetGlobal ("SeeCerr", BooleanValue (true));
+  std::cerr << Simulator::Now ().GetSeconds ()
+            << " Controller received message xid " << xid
+            << " from switch id " << swtch->GetDpId ()
+            << " with packet-in message: " << msgStr
+            << std::endl;
+  return 0;
+}
+
+void
+Controller::HandshakeSuccessful (Ptr<const RemoteSwitch> swtch)
+{
+  NS_LOG_FUNCTION (this << swtch);
+
+  // Get the switch datapath ID
+  uint64_t swDpId = swtch->GetDpId ();
+
+  // Configure te switch to buffer packets and send only the first 128 bytes of
+  // each packet sent to the controller when not using an output action to the
+  // OFPP_CONTROLLER logical port.
+  DpctlExecute (swDpId, "set-config miss=128");
+
+  // After a successfull handshake, let's install the table-miss entries.
+  DpctlExecute (swDpId, "flow-mod cmd=add,table=0,prio=0 apply:output=ctrl:128");
+  DpctlExecute (swDpId, "flow-mod cmd=add,table=1,prio=0 goto:2");
+  DpctlExecute (swDpId, "flow-mod cmd=add,table=2,prio=0 ");
+
+  // Flooding all ARP packets
+  DpctlExecute (swDpId, "flow-mod cmd=add,table=0,prio=10 eth_type=0x0806 apply:output=flood");
+
+  // QoS output queues rules.
+  for (auto const &it : Dscp2QueueMap ())
+    {
+      std::ostringstream cmd;
+      cmd << "flow-mod cmd=add,prio=32"
+          << ",table="        << OFS_TAB_QUEUE
+          << ",flags="        << FLAGS_REMOVED_OVERLAP_RESET
+          << " eth_type="     << IPV4_PROT_NUM
+          << ",ip_dscp="      << static_cast<uint16_t> (it.first)
+          << " write:queue="  << static_cast<uint32_t> (it.second);
+      DpctlExecute (swDpId, cmd.str ());
+    }
+}
+
+/********** Private methods **********/
+
 void
 Controller::SlicingDynamicTimeout (void)
 {
@@ -359,7 +392,7 @@ Controller::SlicingExtraAdjust (
 {
   NS_LOG_FUNCTION (this << lInfo << dir);
 
-//   NS_ASSERT_MSG (GetInterSliceMode () == SliceMode::DYNA,
+//   NS_ASSERT_MSG (m_sliceMode == SliceMode::DYNA,
 //                  "Invalid inter-slice operation mode.");
 
 //   const LinkInfo::EwmaTerm lTerm = LinkInfo::LTERM;
@@ -377,7 +410,7 @@ Controller::SlicingExtraAdjust (
 //       useShareBitRate += lInfo->GetUseBitRate (lTerm, dir, slice);
 //     }
 //   // When enable, sum the spare bit rate too.
-//   if (GetSpareUseMode () == OpMode::ON)
+//   if (m_spareUse == OpMode::ON)
 //     {
 //       maxShareBitRate += lInfo->GetQuoBitRate (dir, SliceId::UNKN);
 //     }
@@ -567,7 +600,7 @@ Controller::SlicingMeterAdjust (
 
   // Update inter-slicing meter, depending on the InterSliceMode attribute.
   NS_ASSERT_MSG (sliceId < SLICE_ALL, "Invalid slice for this operation.");
-  switch (GetInterSliceMode ())
+  switch (m_sliceMode)
     {
     case SliceMode::NONE:
       // Nothing to do when inter-slicing is disabled.
@@ -604,7 +637,7 @@ Controller::SlicingMeterAdjust (
               meterBitRate += lInfo->GetUnrBitRate (dir, slc);
             }
           // When enable, sum the spare bit rate too.
-          if (GetSpareUseMode () == OpMode::ON)
+          if (m_spareUse == OpMode::ON)
             {
               meterBitRate += lInfo->GetUnrBitRate (dir, SLICE_UNKN);
             }
@@ -642,13 +675,12 @@ Controller::SlicingMeterAdjust (
     }
 }
 
-
 void
 Controller::SlicingMeterInstall (Ptr<LinkInfo> lInfo, int sliceId)
 {
   NS_LOG_FUNCTION (this << lInfo << sliceId);
 
-  NS_ASSERT_MSG (GetInterSliceMode () != SliceMode::NONE,
+  NS_ASSERT_MSG (m_sliceMode != SliceMode::NONE,
                  "Invalid inter-slice operation mode.");
 
   // Install slicing meters in both link directions.
@@ -659,7 +691,7 @@ Controller::SlicingMeterInstall (Ptr<LinkInfo> lInfo, int sliceId)
       int64_t meterBitRate = 0;
       if (sliceId == SLICE_ALL)
         {
-          NS_ASSERT_MSG (GetInterSliceMode () == SliceMode::SHAR,
+          NS_ASSERT_MSG (m_sliceMode == SliceMode::SHAR,
                          "Invalid inter-slice operation mode.");
 
           // Iterate over slices with enabled bandwidth sharing
@@ -669,7 +701,7 @@ Controller::SlicingMeterInstall (Ptr<LinkInfo> lInfo, int sliceId)
               meterBitRate += lInfo->GetQuoBitRate (dir, slc);
             }
           // When enable, sum the spare bit rate too.
-          if (GetSpareUseMode () == OpMode::ON)
+          if (m_spareUse == OpMode::ON)
             {
               meterBitRate += lInfo->GetQuoBitRate (dir, SLICE_UNKN);
             }
@@ -698,7 +730,5 @@ Controller::SlicingMeterInstall (Ptr<LinkInfo> lInfo, int sliceId)
     }
 }
 
-
 } // namespace ns3
-
 #endif // NS3_OFSWITCH13
