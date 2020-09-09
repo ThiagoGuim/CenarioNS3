@@ -1,6 +1,6 @@
 /* -*-  Mode: C++; c-file-style: "gnu"; indent-tabs-mode:nil; -*- */
 /*
- * Copyright (c) 2014 University of Campinas (Unicamp)
+ * Copyright (c) 2020 Federal University of Juiz de Fora (UFJF)
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -15,7 +15,8 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *
- * Author:
+ * Author: Thiago Guimarães <thiago.guimaraes@ice.ufjf.br>
+ *         Luciano Chaves <luciano.chaves@ice.ufjf.br>
  */
 
 #include <ns3/netanim-module.h>
@@ -108,7 +109,7 @@ static ns3::GlobalValue
 
 int
 main (int argc, char *argv[])
-{ 
+{
 
   // Customizing the OpenFlow queue type on switch ports.
   Config::SetDefault ("ns3::OFSwitch13Port::QueueFactory", StringValue ("ns3::QosQueue"));
@@ -209,7 +210,7 @@ main (int argc, char *argv[])
                           sliceInterfaces[i][ALL_HOSTS], sliceInterfaces[i][SERVERS]);
 
     }
-    
+
 
   // Enable datapath stats and pcap traces at hosts, switch(es), and controller(s)
   if (trace)
@@ -299,11 +300,11 @@ parse (std::string v, ObjectFactory &factory)
                  }
 
               factory.Set(name, StringValue(value));
-              
+
              }
          }
      }
-  
+
    return;
  }
 
@@ -407,7 +408,7 @@ createAnimation ()
 bool
 PriComp (Ptr<Slice> slice1, Ptr<Slice> slice2)
 {
-  return slice1->GetPrio() < slice2->GetPrio();
+  return slice1->GetPriority() < slice2->GetPriority();
 }
 
 void
@@ -416,7 +417,7 @@ configureSlices(std::string config){
   std::ifstream file;
   file.open(config);
   std::string buffer;
-  
+
   NS_ASSERT_MSG (file.is_open(), "Error while opening the file");
 
   int maxQuota = 0;
@@ -442,8 +443,8 @@ configureSlices(std::string config){
 
     currSlice = slice->GetSliceId();
     currQuota = slice->GetQuota();
-    currNumberHostsSWA = slice->GetNumberHostsSWA();
-    currNumberHostsSWB = slice->GetNumberHostsSWB();
+    currNumberHostsSWA = slice->GetHostsA();
+    currNumberHostsSWB = slice->GetHostsB();
     numberHostsSWA += currNumberHostsSWA;
     numberHostsSWB += currNumberHostsSWB;
     maxQuota += currQuota;
@@ -453,7 +454,7 @@ configureSlices(std::string config){
     NS_ASSERT_MSG (numberHostsSWA < 255, "Number of hostsSWA exceeded");
     NS_ASSERT_MSG (numberHostsSWB < 255, "Number of hostsSWB exceeded");
     NS_ASSERT_MSG (numberSlices < 255, "Number of slices exceeded");
-    
+
     slices.push_back(slice);
 
     //Creates the NodeContainers and assign them to the respective slice
@@ -577,7 +578,7 @@ configureSlices(std::string config){
     interfaces.push_back (allHostsIpIfaces);
 
     sliceInterfaces.push_back (interfaces);
-    
+
     numberSlices++;
   }
 
@@ -585,10 +586,10 @@ configureSlices(std::string config){
 
   for(std::vector<Ptr<Slice>>::iterator it = slices.begin(); it != slices.end(); ++it){
     std::cout << "SliceId = " << (*it)->GetSliceId() << "| ";
-    std::cout << "Prio = " << (*it)->GetPrio() << "| ";
+    std::cout << "Prio = " << (*it)->GetPriority() << "| ";
     std::cout << "Quota = " << (*it)->GetQuota() << "| ";
-    std::cout << "HostsSWA = " << (*it)->GetNumberHostsSWA() << "| ";
-    std::cout << "HostsSWB = " << (*it)->GetNumberHostsSWB() << std::endl;
+    std::cout << "HostsSWA = " << (*it)->GetHostsA() << "| ";
+    std::cout << "HostsSWB = " << (*it)->GetHostsB() << std::endl;
   }
 
   file.close();

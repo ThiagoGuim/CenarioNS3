@@ -15,23 +15,24 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *
- * Author: Luciano Chaves <luciano.chaves@ice.ufjf.br>
+ * Author: Thiago Guimarães <thiago.guimaraes@ice.ufjf.br>
+ *         Luciano Chaves <luciano.chaves@ice.ufjf.br>
  */
 
 #include "slice.h"
+#include "../common.h"
 
 namespace ns3 {
 
 NS_LOG_COMPONENT_DEFINE ("Slice");
 NS_OBJECT_ENSURE_REGISTERED (Slice);
 
-
 Slice::Slice ()
   : m_sliceId (0),
   m_prio (0),
   m_quota (0),
-  m_hostsSWA (0),
-  m_hostsSWB (0)
+  m_hostsA (0),
+  m_hostsB (0)
 {
   NS_LOG_FUNCTION (this);
 }
@@ -50,92 +51,96 @@ Slice::GetTypeId (void)
     .AddAttribute ("SliceId", "Slice identifier.",
                    UintegerValue (0),
                    MakeUintegerAccessor (&Slice::m_sliceId),
-                   MakeUintegerChecker<uint16_t> ())
-    .AddAttribute ("Priority",
-                   "Slice priority.",
+                   MakeUintegerChecker<uint16_t> (SLICE_UNKN, N_MAX_SLICES))
+    .AddAttribute ("Priority", "Slice priority.",
                    UintegerValue (0),
                    MakeUintegerAccessor (&Slice::m_prio),
                    MakeUintegerChecker<uint16_t> ())
-    .AddAttribute ("Quota",
-                   "The given quota to this Slice.",
+    .AddAttribute ("Quota", "Slice quota.",
                    UintegerValue (0),
                    MakeUintegerAccessor (&Slice::m_quota),
-                   MakeUintegerChecker<uint16_t> ())
-    .AddAttribute ("HostsSWA",
-                   "Number of hosts attached to switch A.",
+                   MakeUintegerChecker<uint16_t> (0, 100))
+    .AddAttribute ("HostsA", "Number of hosts attached to switch A.",
                    UintegerValue (0),
-                   MakeUintegerAccessor (&Slice::m_hostsSWA),
-                   MakeUintegerChecker<uint16_t> ())
-    .AddAttribute ("HostsSWB",
-                   "Number of hosts attached to switch B.",
+                   MakeUintegerAccessor (&Slice::m_hostsA),
+                   MakeUintegerChecker<uint16_t> (0, 255))
+    .AddAttribute ("HostsB", "Number of hosts attached to switch B.",
                    UintegerValue (0),
-                   MakeUintegerAccessor (&Slice::m_hostsSWB),
-                   MakeUintegerChecker<uint16_t> ())
+                   MakeUintegerAccessor (&Slice::m_hostsB),
+                   MakeUintegerChecker<uint16_t> (0, 255))
   ;
   return tid;
 }
 
-
-void 
-Slice::SetSliceId(uint16_t value)
+void
+Slice::SetSliceId (uint16_t value)
 {
+  NS_LOG_FUNCTION (this << value);
+
   m_sliceId = value;
 }
 
-void 
-Slice::SetPrio(uint16_t value)
+void
+Slice::SetPriority (uint16_t value)
 {
+  NS_LOG_FUNCTION (this << value);
+
   m_prio = value;
 }
 
-void 
-Slice::SetQuota(uint16_t value)
+void
+Slice::SetQuota (uint16_t value)
 {
+  NS_LOG_FUNCTION (this << value);
+
   m_quota = value;
 }
 
-void 
-Slice::SetNumberHostsSWA(uint16_t value)
+void
+Slice::SetHostsA (uint16_t value)
 {
-  m_hostsSWA = value;
+  NS_LOG_FUNCTION (this << value);
+
+  m_hostsA = value;
 }
 
-void 
-Slice::SetNumberHostsSWB(uint16_t value)
+void
+Slice::SetHostsB (uint16_t value)
 {
-  m_hostsSWB = value;
+  NS_LOG_FUNCTION (this << value);
+
+  m_hostsB = value;
 }
 
-uint16_t 
-Slice::GetSliceId()
+uint16_t
+Slice::GetSliceId (void) const
 {
   return m_sliceId;
 }
 
 uint16_t
-Slice::GetPrio()
+Slice::GetPriority (void) const
 {
   return m_prio;
 }
 
-uint16_t 
-Slice::GetQuota()
+uint16_t
+Slice::GetQuota (void) const
 {
   return m_quota;
 }
 
-uint16_t 
-Slice::GetNumberHostsSWA()
+uint16_t
+Slice::GetHostsA (void) const
 {
-  return m_hostsSWA;
+  return m_hostsA;
 }
 
-uint16_t 
-Slice::GetNumberHostsSWB()
+uint16_t
+Slice::GetHostsB (void) const
 {
-  return m_hostsSWB;
+  return m_hostsB;
 }
-
 
 void
 Slice::DoDispose ()

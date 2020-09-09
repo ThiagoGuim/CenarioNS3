@@ -15,7 +15,8 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *
- * Author: Luciano Chaves <luciano.chaves@ice.ufjf.br>
+ * Author: Thiago Guimarães <thiago.guimaraes@ice.ufjf.br>
+ *         Luciano Chaves <luciano.chaves@ice.ufjf.br>
  */
 
 #ifndef SLICE_H
@@ -26,7 +27,7 @@
 namespace ns3 {
 
 /**
- * 
+ * Class for slice metadata.
  */
 class Slice : public Object
 {
@@ -41,78 +42,39 @@ public:
   static TypeId GetTypeId (void);
 
   /**
-   * Record the identifier of this Slice.
-   * \param number that identifies this Slice.
+   * \name Private member accessors for slice information.
+   * \param value The value to set.
    */
-  void SetSliceId(uint16_t value);
+  //\{
+  void SetSliceId   (uint16_t value);
+  void SetPriority  (uint16_t value);
+  void SetQuota     (uint16_t value);
+  void SetHostsA    (uint16_t value);
+  void SetHostsB    (uint16_t value);
+  //\}
 
   /**
-   * Record the priority of this Slice.
-   * \param priority number of this Slice .
+   * \name Private member accessors for slice information.
+   * \return The requested information.
    */
-  void SetPrio(uint16_t value);
-
-  /**
-   * Record the quota given to this Slice.
-   * \param number that represents the quota given to this Slice.
-   */
-  void SetQuota(uint16_t value);
-
-  /**
-   * Record the number of hosts attached to switch A that belong to this Slice.
-   * \param number of hosts attached to switch A that belong to this Slice.
-   */
-  void SetNumberHostsSWA(uint16_t value);
-
-  /**
-   * Record the number of hosts attached to switch B that belong to this Slice.
-   * \param number of hosts attached to switch B that belong to this Slice.
-   */
-  void SetNumberHostsSWB(uint16_t value);
-
-  /**
-   * Get this Slice identifier.
-   * \return A integer that represents this Slice identifier.
-   */
-  uint16_t GetSliceId();
-
-  /**
-   * Get this Slice priority.
-   * \return A integer that represents this Slice priority.
-   */
-  uint16_t GetPrio();
-
-  /**
-   * Get the quota given to this Slice.
-   * \return A integer that represents this Slice Quota.
-   */
-  uint16_t GetQuota();
-
-  /**
-   * Get the number of hosts attached to switch A that belong to this Slice.
-   * \return The number of hosts attached to switch A that belong to this Slice.
-   */
-  uint16_t GetNumberHostsSWA();
-
-  /**
-   * Get the number of hosts attached to switch B that belong to this Slice.
-   * \return The number of hosts attached to switch B that belong to this Slice.
-   */
-  uint16_t GetNumberHostsSWB();
-
+  //\{
+  uint16_t GetSliceId   (void) const;
+  uint16_t GetPriority  (void) const;
+  uint16_t GetQuota     (void) const;
+  uint16_t GetHostsA    (void) const;
+  uint16_t GetHostsB    (void) const;
+  //\}
 
 protected:
   /** Destructor implementation. */
   virtual void DoDispose ();
 
 private:
-  
   uint16_t m_sliceId;      //!< Slice identifier.
   uint16_t m_prio;         //!< Slice priority.
-  uint16_t m_quota;        //!< The given quota to this Slice.
-  uint16_t m_hostsSWA;    //!< Number of hosts attached to switch A.
-  uint16_t m_hostsSWB;    //!< Number of hosts attached to switch B.
-
+  uint16_t m_quota;        //!< Slice quota.
+  uint16_t m_hostsA;       //!< Number of hosts attached to switch A.
+  uint16_t m_hostsB;       //!< Number of hosts attached to switch B.
 };
 
 } // namespace ns3
