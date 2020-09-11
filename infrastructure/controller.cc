@@ -95,78 +95,64 @@ Controller::GetTypeId (void)
 }
 
 void
-Controller::NotifyClientsServers (TopologyIfaces_t sliceInterfaces,
-                                  TopologyPorts_t switchPorts)
+Controller::NotifyHost (
+  Ptr<OFSwitch13Port> swPort, Ptr<NetDevice> hostDev)
 {
+  NS_LOG_FUNCTION (this << swPort << hostDev);
 
-  m_numberSlices = sliceInterfaces.size ();
+  // Installing the forwarding rules to host
+  std::ostringstream cmd;
+  cmd << "flow-mod cmd=add,table=0,prio=1000"
+      << " eth_type=0x0800,ip_dst=" << Ipv4AddressHelper::GetAddress (hostDev)
+      << " write:output=" << swPort->GetPortNo ()
+      << " goto:2";
+  DpctlExecute (swPort->GetSwitchDevice ()->GetDpId (), cmd.str ());
 
-  //Go through slices
-  for (size_t sl = 0; sl < m_numberSlices; sl++)
-    {
-
-      //Switch between HostsSWA/HostsSWB/Servers
-      for (size_t sw = 0; sw < 3; sw++)
-        {
-
-          for (size_t iface = 0; iface < sliceInterfaces[sl][sw].GetN (); iface++)
-            {
-
-              //Address/Port pair
-              Ipv4Address address = sliceInterfaces[sl][sw].GetAddress (iface);
-              Ptr<OFSwitch13Port> port = switchPorts[sl][sw][iface];
-
-              //Install the rule on switches
-              std::ostringstream cmd;
-              cmd << "flow-mod cmd=add,table=0,prio=1000"
-                  << " eth_type=0x0800,ip_dst=" << address
-                  << " write:output=" << port->GetPortNo ()
-                  << " goto:2"; //Skip meter table
-              DpctlExecute (port->GetSwitchDevice ()->GetDpId (), cmd.str ());
-
-
-            }
-        }
-
-    }
-
+  NS_LOG_INFO ("Host IP " << Ipv4AddressHelper::GetAddress (hostDev) <<
+               " connected to port " << swPort->GetPortNo () <<
+               " at switch id " << swPort->GetSwitchDevice ()->GetDpId ());
 }
 
 void
-Controller::NotifySwitches (PortsList_t switchesPorts,
-                            OFSwitch13DeviceContainer switchDevices)
+Controller::NotifySwitches (
+  OFSwitch13DeviceContainer switchDevices, PortsList_t switchesPorts)
 {
-  // Installing the fowarding rules between switches.
+  NS_LOG_FUNCTION (this);
 
-  // Switch A - right
-  std::ostringstream cmd;
-  cmd << "flow-mod cmd=add,table=0,prio=500"
+  // Installing the forwarding rules between the switches.
+  NS_ASSERT_MSG (switchDevices.GetN () == 3, "Invalid number of switches.");
+  NS_ASSERT_MSG (switchesPorts.size () == 4, "Invalid number of ports.");
+  NS_LOG_INFO ("Configuring connections between switches.");
+
+  // Switch A - right (to switch B)
+  std::ostringstream cmd1;
+  cmd1 << "flow-mod cmd=add,table=0,prio=500"
       << " eth_type=0x0800,ip_dst=10.0.2.0/255.0.255.0"
-      << " write:output=" << switchesPorts[0]->GetPortNo ()
+      << " write:output=" << switchesPorts.at (0)->GetPortNo ()
       << " goto:1";
-  DpctlExecute (switchDevices.Get (0)->GetDpId (), cmd.str ());
+  DpctlExecute (switchDevices.Get (0)->GetDpId (), cmd1.str ());
 
-  // Switch B - left
+  // Switch B - left (to switch A)
   std::ostringstream cmd2;
   cmd2 << "flow-mod cmd=add,table=0,prio=500"
        << " eth_type=0x0800,ip_dst=10.0.1.0/255.0.255.0"
-       << " write:output=" << switchesPorts[1]->GetPortNo ()
+       << " write:output=" << switchesPorts.at (1)->GetPortNo ()
        << " goto:1";
   DpctlExecute (switchDevices.Get (1)->GetDpId (), cmd2.str ());
 
-  // Switch B - right
+  // Switch B - right (to switch C)
   std::ostringstream cmd3;
   cmd3 << "flow-mod cmd=add,table=0,prio=500"
        << " eth_type=0x0800,ip_dst=10.0.2.0/255.0.255.0"
-       << " write:output=" << switchesPorts[2]->GetPortNo ()
+       << " write:output=" << switchesPorts.at (2)->GetPortNo ()
        << " goto:1";
   DpctlExecute (switchDevices.Get (1)->GetDpId (), cmd3.str ());
 
-  // Switch C - left
+  // Switch C - left (to switch B)
   std::ostringstream cmd4;
   cmd4 << "flow-mod cmd=add,table=0,prio=500"
        << " eth_type=0x0800,ip_dst=10.0.1.0/255.0.255.0"
-       << " write:output=" << switchesPorts[3]->GetPortNo ()
+       << " write:output=" << switchesPorts.at (3)->GetPortNo ()
        << " goto:1";
   DpctlExecute (switchDevices.Get (2)->GetDpId (), cmd4.str ());
 
@@ -175,11 +161,31 @@ Controller::NotifySwitches (PortsList_t switchesPorts,
   m_lInfoB = LinkInfo::GetPointer (2, 3);
 }
 
+// Comparator for slice priorities.
+bool
+PriComp (Ptr<SliceInfo> slice1, Ptr<SliceInfo> slice2)
+{
+  return slice1->GetPriority () < slice2->GetPriority ();
+}
 
 void
-Controller::ConfigureMeters (std::vector<Ptr<SliceInfo>> slices)
+Controller::NotifySlices (SliceInfoList_t slices)
 {
+  NS_LOG_FUNCTION (this << slices);
 
+  std::stable_sort (slices.begin (), slices.end (),
+                    SliceInfo::PriorityComparator);
+
+  // Iterate over slices to dump informpation.
+  for (auto const &sInfo : slices)
+    {
+      std::cout << "SliceId = "   << sInfo->GetSliceId ()   << " | ";
+      std::cout << "Prio = "      << sInfo->GetPriority ()  << " | ";
+      std::cout << "Quota = "     << sInfo->GetQuota ()     << " | ";
+      std::cout << "NumHostsA = " << sInfo->GetNumHostsA () << " | ";
+      std::cout << "NumHostsB = " << sInfo->GetNumHostsB () << std::endl;
+    }
+  return;
 
   for (std::vector<Ptr<SliceInfo>>::iterator it = slices.begin (); it != slices.end (); ++it)
     {

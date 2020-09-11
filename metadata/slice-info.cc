@@ -59,16 +59,16 @@ SliceInfo::GetTypeId (void)
     .AddAttribute ("Quota", "Slice quota.",
                    UintegerValue (0),
                    MakeUintegerAccessor (&SliceInfo::m_quota),
-                   MakeUintegerChecker<uint16_t> (0, 100))
-    .AddAttribute ("HostsA", "Number of hosts attached to switch A.",
+                   MakeUintegerChecker<uint16_t> (1, 100))
+    .AddAttribute ("NumHostsA", "Number of hosts attached to switch A.",
                    TypeId::ATTR_GET | TypeId::ATTR_CONSTRUCT,
                    UintegerValue (0),
-                   MakeUintegerAccessor (&SliceInfo::m_hostsA),
+                   MakeUintegerAccessor (&SliceInfo::m_numHostsA),
                    MakeUintegerChecker<uint16_t> (0, 255))
-    .AddAttribute ("HostsB", "Number of hosts attached to switch B.",
+    .AddAttribute ("NumHostsB", "Number of hosts attached to switch B.",
                    TypeId::ATTR_GET | TypeId::ATTR_CONSTRUCT,
                    UintegerValue (0),
-                   MakeUintegerAccessor (&SliceInfo::m_hostsB),
+                   MakeUintegerAccessor (&SliceInfo::m_numHostsB),
                    MakeUintegerChecker<uint16_t> (0, 255))
   ;
   return tid;
@@ -99,19 +99,19 @@ SliceInfo::SetQuota (uint16_t value)
 }
 
 void
-SliceInfo::SetHostsA (uint16_t value)
+SliceInfo::SetNumHostsA (uint16_t value)
 {
   NS_LOG_FUNCTION (this << value);
 
-  m_hostsA = value;
+  m_numHostsA = value;
 }
 
 void
-SliceInfo::SetHostsB (uint16_t value)
+SliceInfo::SetNumHostsB (uint16_t value)
 {
   NS_LOG_FUNCTION (this << value);
 
-  m_hostsB = value;
+  m_numHostsB = value;
 }
 
 uint16_t
@@ -133,15 +133,27 @@ SliceInfo::GetQuota (void) const
 }
 
 uint16_t
-SliceInfo::GetHostsA (void) const
+SliceInfo::GetNumHostsA (void) const
 {
-  return m_hostsA;
+  return m_numHostsA;
 }
 
 uint16_t
-SliceInfo::GetHostsB (void) const
+SliceInfo::GetNumHostsB (void) const
 {
-  return m_hostsB;
+  return m_numHostsB;
+}
+
+uint16_t
+SliceInfo::GetNumHostsC (void) const
+{
+  return m_numHostsA + m_numHostsB;
+}
+
+bool
+SliceInfo::PriorityComparator (Ptr<SliceInfo> slice1, Ptr<SliceInfo> slice2)
+{
+  return slice1->GetPriority () < slice2->GetPriority ();
 }
 
 void
@@ -154,6 +166,11 @@ void
 SliceInfo::NotifyConstructionCompleted (void)
 {
   NS_LOG_FUNCTION (this);
+
+  // Creating host nodes
+  // m_nodesA.Create (m_numHostsA);
+  // m_nodesB.Create (m_numHostsB);
+  // m_nodesC.Create (m_numHostsA + m_numHostsB);
 
   RegisterSliceInfo (Ptr<SliceInfo> (this));
   Object::NotifyConstructionCompleted ();

@@ -29,22 +29,6 @@
 namespace ns3 {
 
 // ----------------------------------------------------------------------------
-/** Constants that represent the indexes in the vectors. */
-typedef enum
-{
-  HOSTS_SWA = 0,    //!< The hosts of switch SWA inside de vectors.
-  HOSTS_SWB = 1,    //!< The hosts of switch SWB inside de vectors.
-  SERVERS   = 2,    //!< The servers inside de vectors.
-  ALL_HOSTS = 3     //!< All the hosts (SWA+SWB) inside de vectors.
-} Indexes;
-// ----------------------------------------------------------------------------
-
-
-typedef std::vector<Ptr<OFSwitch13Port>> PortsList_t;
-
-
-
-// ----------------------------------------------------------------------------
 // Valid number of slices and IDs
 #define N_MAX_SLICES  14    //!< Slice IDs ranging from 1 to 14. Don't change!
 #define SLICE_UNKN    0

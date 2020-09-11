@@ -51,11 +51,11 @@ public:
    * \param value The value to set.
    */
   //\{
-  void SetSliceId   (uint16_t value);
-  void SetPriority  (uint16_t value);
-  void SetQuota     (uint16_t value);
-  void SetHostsA    (uint16_t value);
-  void SetHostsB    (uint16_t value);
+  void SetSliceId     (uint16_t value);
+  void SetPriority    (uint16_t value);
+  void SetQuota       (uint16_t value);
+  void SetNumHostsA   (uint16_t value);
+  void SetNumHostsB   (uint16_t value);
   //\}
 
   /**
@@ -63,11 +63,12 @@ public:
    * \return The requested information.
    */
   //\{
-  uint16_t GetSliceId   (void) const;
-  uint16_t GetPriority  (void) const;
-  uint16_t GetQuota     (void) const;
-  uint16_t GetHostsA    (void) const;
-  uint16_t GetHostsB    (void) const;
+  uint16_t GetSliceId     (void) const;
+  uint16_t GetPriority    (void) const;
+  uint16_t GetQuota       (void) const;
+  uint16_t GetNumHostsA   (void) const;
+  uint16_t GetNumHostsB   (void) const;
+  uint16_t GetNumHostsC   (void) const;
   //\}
 
   /**
@@ -82,6 +83,14 @@ public:
    * \return The slice information.
    */
   static Ptr<SliceInfo> GetPointer (uint16_t sliceId);
+
+  /**
+   * Custom comparator for slice priority.
+   * \param slice1 The first slice.
+   * \param slice2 The second slice.
+   * \return True if the priority of slice1 is lower than slice2.
+   */
+  static bool PriorityComparator (Ptr<SliceInfo> slice1, Ptr<SliceInfo> slice2);
 
 protected:
   /** Destructor implementation. */
@@ -100,8 +109,8 @@ private:
   uint16_t m_sliceId;      //!< Slice identifier.
   uint16_t m_prio;         //!< Slice priority.
   uint16_t m_quota;        //!< Slice quota.
-  uint16_t m_hostsA;       //!< Number of hosts attached to switch A.
-  uint16_t m_hostsB;       //!< Number of hosts attached to switch B.
+  uint16_t m_numHostsA;    //!< Number of hosts attached to switch A.
+  uint16_t m_numHostsB;    //!< Number of hosts attached to switch B.
 
   /**
    * Map saving slice ID / slice information.

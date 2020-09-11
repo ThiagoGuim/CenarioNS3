@@ -26,21 +26,18 @@
 #include <ns3/internet-module.h>
 #include <ns3/ofswitch13-module.h>
 
-#include "../metadata/link-info.h"
 #include "../infrastructure/qos-queue.h"
+#include "../metadata/link-info.h"
 #include "../metadata/slice-info.h"
 
 namespace ns3 {
 
 class LinkInfo;
 
-
-typedef std::vector<std::vector<PortsList_t>> TopologyPorts_t;
-typedef std::vector<std::vector<Ipv4InterfaceContainer>> TopologyIfaces_t;
+typedef std::vector<Ptr<OFSwitch13Port>> PortsList_t;
 
 /**
- * \ingroup ofswitch13
- * \brief An Learning OpenFlow 1.3 controller (works as L2 switch)
+ * Our custom controller.
  */
 class Controller : public OFSwitch13Controller
 {
@@ -55,34 +52,26 @@ public:
   static TypeId GetTypeId (void);
 
   /**
-   * Notify the controller that all nodes have been configured
-   * such as the ports on the switches.
-   *
-   * \param slice_interfaces The vector that contains the info about nodes addressing.
-   * \param switch_ports The vector that contains the pointer to each port on switches.
-   * \return void.
+   * Notify the controller of a new host node connected to the OpenFlow network.
+   * \param swPort The OpenFlow port at the switch device.
+   * \param hostDev The device created at the host node.
    */
-  void NotifyClientsServers (TopologyIfaces_t sliceInterfaces,
-                             TopologyPorts_t switchPorts);
+  void NotifyHost (Ptr<OFSwitch13Port> swPort, Ptr<NetDevice> hostDev);
+
+  /**
+   * Notify the controller of all slices created and configured.
+   * \param slices The list of slice information.
+   */
+  void NotifySlices (SliceInfoList_t slices);
 
   /**
    * Notify the controller that all switches have been configured
-   * so it can install the respectives rules.
-   *
-   * \param interSwitchesPorts Vector that contains the Pointers to the ports between the switches.
-   * \param switchDevices Container responsible to store de Devices of each switch.
-   * \return void.
+   * so it can install the respectives forwarding rules.
+   * \param switchDevices The OpenFlow switch devices.
+   * \param switchPorts The ports between the switches.
    */
-  void NotifySwitches (PortsList_t interSwitchesPorts,
-                       OFSwitch13DeviceContainer switchDevices);
-
-  /**
-   * Install the meters for each slice into Meter Table.
-   *
-   * \param sliceQuotas Vector that contains the slice quotas.
-   * \return void.
-   */
-  void ConfigureMeters (std::vector<Ptr<SliceInfo>> slices);
+  void NotifySwitches (OFSwitch13DeviceContainer switchDevices,
+                       PortsList_t switchPorts);
 
 protected:
   /** Destructor implementation */
