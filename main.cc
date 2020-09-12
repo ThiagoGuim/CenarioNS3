@@ -292,25 +292,8 @@ main (int argc, char *argv[])
           controllerApp->NotifyHost (switchPortsC.at (i), hostDevicesC.Get (i));
         }
 
-
-      // --------------------------------------------------------------------------
-      // Configuring the applications for this slice
-      // --------------------------------------------------------------------------
-      Ptr<ExponentialRandomVariable> startRng = CreateObject<ExponentialRandomVariable> ();
-      startRng->SetAttribute ("Mean", DoubleValue (5));
-
-      // Configuring traffic patterns for this slice
-      Ptr<UdpPeerHelper> appHelper = CreateObject<UdpPeerHelper> ();
-      appHelper->SetAttribute ("NumApps", UintegerValue (20));
-      appHelper->SetAttribute ("StartInterval", PointerValue (startRng));
-
-      // // Define the packet size and interval for UDP traffic.
-      // appHelper->SetBothAttribute ("PktInterval", StringValue ("ns3::NormalRandomVariable[Mean=0.01|Variance=0.001]"));
-      // appHelper->SetBothAttribute ("PktSize", StringValue ("ns3::UniformRandomVariable[Min=1024|Max=1460]"));
-
-      // // Disable the traffic at the UDP server node.
-      // appHelper->Set2ndAttribute ("PktInterval", StringValue ("ns3::ConstantRandomVariable[Constant=1000000]"));
-
+      // Install applications for this slice
+      Ptr<UdpPeerHelper> appHelper = slice->GetAppHelper ();
       appHelper->SetBothAttribute ("SliceId", UintegerValue (slice->GetSliceId ()));
       appHelper->Install (hostsAB, hostsC, hostIpIfacesAB, hostIpIfacesC);
     }
@@ -487,7 +470,7 @@ EnableVerbose (bool enable)
 
       // Applications
       LogComponentEnable ("UdpPeerApp",               logLevelWarn);
-      LogComponentEnable ("UdpPeerHelper",            logLevelWarn);
+      LogComponentEnable ("UdpPeerHelper",            logLevelWarnInfo);
 
       // Infrastructure
       LogComponentEnable ("Controller",               logLevelAll);

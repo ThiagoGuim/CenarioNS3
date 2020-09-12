@@ -44,6 +44,15 @@ public:
   static TypeId GetTypeId (void);
 
   /**
+   * \name Private member accessors for slice information.
+   * \return The requested information.
+   */
+  //\{
+  uint16_t GetNumApps     (void) const;
+  Time     GetStartOffset (void) const;
+  //\}
+
+  /**
    * Record an attribute to be set in the first application.
    * \param name the name of the attribute to set.
    * \param value the value of the attribute to set.
@@ -86,12 +95,14 @@ public:
    * \param portNo The port number for both nodes.
    * \param dscp The DSCP value used to set the socket Type of Service field.
    * \param startTime The time to start both applications.
+   * \param lengthTime The length time for both applications.
    * \return The container with the pair of applications created.
    */
   ApplicationContainer InstallApp (
     Ptr<Node> node1st, Ptr<Node> node2nd,
     Ipv4Address addr1st, Ipv4Address addr2nd,
-    uint16_t portNo, Ipv4Header::DscpType dscp, Time startTime);
+    uint16_t portNo, Ipv4Header::DscpType dscp,
+    Time startTime, Time lengthTime);
 
 protected:
   /** Destructor implementation. */
@@ -109,8 +120,11 @@ private:
 
   uint16_t                    m_numApps;      //!< Number of apps per host.
   Time                        m_startOff;     //!< Start offset time.
-  Ptr<RandomVariableStream>   m_startRng;     //!< Start interval time.
   Time                        m_startTime;    //!< The cummulative start time.
+  Ptr<RandomVariableStream>   m_startRng;     //!< Start interval time.
+  Ptr<RandomVariableStream>   m_rateRng;      //!< The app traffic data rate.
+  Ptr<RandomVariableStream>   m_lengthRng;    //!< The app traffic length.
+
   static uint16_t             m_port;         //!< Port numbers for apps.
 };
 

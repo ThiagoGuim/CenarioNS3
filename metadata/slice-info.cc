@@ -78,7 +78,7 @@ SliceInfo::GetTypeId (void)
                    MakeUintegerChecker<uint16_t> (0, 255))
     .AddAttribute ("AppHelper", "Application helper for traffic configuration.",
                    TypeId::ATTR_GET | TypeId::ATTR_CONSTRUCT,
-                   PointerValue (),
+                   StringValue ("ns3::UdpPeerHelper[]"),
                    MakePointerAccessor (&SliceInfo::m_appHelper),
                    MakePointerChecker<UdpPeerHelper> ())
   ;

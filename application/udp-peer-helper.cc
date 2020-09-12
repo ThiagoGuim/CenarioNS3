@@ -29,8 +29,7 @@ NS_OBJECT_ENSURE_REGISTERED (UdpPeerHelper);
 uint16_t UdpPeerHelper::m_port = 10000;
 
 UdpPeerHelper::UdpPeerHelper ()
-  : m_startRng (0),
-  m_startTime (Seconds (0))
+  : m_startTime (Seconds (0))
 {
   NS_LOG_FUNCTION (this);
 
@@ -53,18 +52,36 @@ UdpPeerHelper::GetTypeId (void)
                    UintegerValue (1),
                    MakeUintegerAccessor (&UdpPeerHelper::m_numApps),
                    MakeUintegerChecker<uint16_t> ())
-    .AddAttribute ("StartOffset",
-                   "The initial interval before starting apps.",
+    .AddAttribute ("DataRate", "A random variable for the traffic data rate [kbps].",
+                   StringValue ("ns3::ExponentialRandomVariable[Mean=1024]"),
+                   MakePointerAccessor (&UdpPeerHelper::m_rateRng),
+                   MakePointerChecker <RandomVariableStream> ())
+    .AddAttribute ("StartInterval", "A random variable for the start interval between app [s].",
+                   StringValue ("ns3::ExponentialRandomVariable[Mean=30.0]"),
+                   MakePointerAccessor (&UdpPeerHelper::m_startRng),
+                   MakePointerChecker<RandomVariableStream> ())
+    .AddAttribute ("StartOffset", "The waiting interval before starting apps [s].",
                    TimeValue (Seconds (0)),
                    MakeTimeAccessor (&UdpPeerHelper::m_startOff),
                    MakeTimeChecker ())
-    .AddAttribute ("StartInterval",
-                   "A random variable for the interval between app starts.",
-                   StringValue ("ns3::ExponentialRandomVariable[Mean=60.0]"),
-                   MakePointerAccessor (&UdpPeerHelper::m_startRng),
-                   MakePointerChecker<RandomVariableStream> ())
+    .AddAttribute ("TrafficLength", "A random variable for the traffic length [s].",
+                   StringValue ("ns3::NormalRandomVariable[Mean=30|Variance=100]"),
+                   MakePointerAccessor (&UdpPeerHelper::m_lengthRng),
+                   MakePointerChecker <RandomVariableStream> ())
   ;
   return tid;
+}
+
+uint16_t
+UdpPeerHelper::GetNumApps (void) const
+{
+  return m_numApps;
+}
+
+Time
+UdpPeerHelper::GetStartOffset (void) const
+{
+  return m_startOff;
 }
 
 void
@@ -104,11 +121,41 @@ UdpPeerHelper::Install (
       for (uint16_t j = 0; j < m_numApps; j++)
         {
           m_startTime += Seconds (std::abs (m_startRng->GetValue ()));
-          InstallApp (nodes1st.Get (i), nodes2nd.Get (i),
-                      addr1st.GetAddress (i), addr2nd.GetAddress (i),
-                      GetNextPortNo (), dscp, m_startTime);
-          NS_LOG_INFO ("App " << j << " at node " << i <<
-                       " will start at " << m_startTime.GetSeconds ());
+          Time lengthTime = Seconds (std::abs (m_lengthRng->GetValue ()));
+
+          ApplicationContainer apps;
+          apps = InstallApp (nodes1st.Get (i), nodes2nd.Get (i),
+                             addr1st.GetAddress (i), addr2nd.GetAddress (i),
+                             GetNextPortNo (), dscp, m_startTime, lengthTime);
+
+          // Fix the packet size at 1024 bytes and compute the packet interval
+          // to match the desired data rate.
+          DataRate cbr (std::abs (m_rateRng->GetValue () * 1000));
+          double pktSize = 1024;
+          double pktInterval = (pktSize * 8 / static_cast<double> (cbr.GetBitRate ()));
+
+          // Update app attributes to the desired bit rate.
+          apps.Get (0)->SetAttribute (
+            "PktSize", PointerValue (
+              CreateObjectWithAttributes<ConstantRandomVariable> (
+                "Constant", DoubleValue (pktSize))));
+          apps.Get (1)->SetAttribute (
+            "PktSize", PointerValue (
+              CreateObjectWithAttributes<ConstantRandomVariable> (
+                "Constant", DoubleValue (pktSize))));
+          apps.Get (0)->SetAttribute (
+            "PktInterval", PointerValue (
+              CreateObjectWithAttributes<ConstantRandomVariable> (
+                "Constant", DoubleValue (pktInterval))));
+          apps.Get (1)->SetAttribute (
+            "PktInterval", PointerValue (
+              CreateObjectWithAttributes<ConstantRandomVariable> (
+                "Constant", DoubleValue (pktInterval))));
+
+          NS_LOG_INFO ("App " << j << " at host " << i <<
+                       " will start at " << m_startTime.GetSeconds () <<
+                       " with data rate of " << Bps2Kbps (cbr) <<
+                       " and traffic length of " << lengthTime.GetSeconds ());
         }
     }
 }
@@ -117,7 +164,8 @@ ApplicationContainer
 UdpPeerHelper::InstallApp (
   Ptr<Node> node1st, Ptr<Node> node2nd,
   Ipv4Address addr1st, Ipv4Address addr2nd,
-  uint16_t portNo, Ipv4Header::DscpType dscp, Time startTime)
+  uint16_t portNo, Ipv4Header::DscpType dscp,
+  Time startTime, Time lengthTime)
 {
   uint8_t ipTos = dscp << 2;
 
@@ -143,6 +191,8 @@ UdpPeerHelper::InstallApp (
 
   Simulator::Schedule (startTime, &UdpPeerApp::StartTraffic, app1st);
   Simulator::Schedule (startTime, &UdpPeerApp::StartTraffic, app2nd);
+  Simulator::Schedule (startTime + lengthTime, &UdpPeerApp::StopTraffic, app1st);
+  Simulator::Schedule (startTime + lengthTime, &UdpPeerApp::StopTraffic, app2nd);
 
   return apps;
 }
@@ -150,6 +200,9 @@ UdpPeerHelper::InstallApp (
 void
 UdpPeerHelper::DoDispose ()
 {
+  m_startRng = 0;
+  m_rateRng = 0;
+  m_lengthRng = 0;
   Object::DoDispose ();
 }
 
