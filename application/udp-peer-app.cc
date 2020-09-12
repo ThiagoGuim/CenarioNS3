@@ -58,12 +58,12 @@ UdpPeerApp::GetTypeId (void)
                    MakeAddressChecker ())
     .AddAttribute ("PktInterval",
                    "A random variable for the interval between packets [s].",
-                   StringValue ("ns3::ConstantRandomVariable[Constant=0.08]"),
+                   StringValue ("ns3::ConstantRandomVariable[Constant=1]"),
                    MakePointerAccessor (&UdpPeerApp::m_pktInterRng),
                    MakePointerChecker <RandomVariableStream> ())
     .AddAttribute ("PktSize",
                    "A random variable for the packet size [bytes].",
-                   StringValue ("ns3::ConstantRandomVariable[Constant=1000]"),
+                   StringValue ("ns3::ConstantRandomVariable[Constant=1024]"),
                    MakePointerAccessor (&UdpPeerApp::m_pktSizeRng),
                    MakePointerChecker <RandomVariableStream> ())
     .AddAttribute ("QosType", "Traffic QoS indicator.",
