@@ -44,10 +44,11 @@ public:
    */
   static TypeId GetTypeId (void);
 
-  /**
-   * Start the application traffic.
-   */
+  /** Start the application traffic. */
   void StartTraffic (void);
+
+  /** Stop the application traffic. */
+  void StopTraffic (void);
 
 protected:
   /** Destructor implementation */
@@ -80,7 +81,6 @@ private:
   Address                     m_peerAddress;    //!< Peer address.
   Ptr<RandomVariableStream>   m_pktInterRng;    //!< Packet interval time.
   Ptr<RandomVariableStream>   m_pktSizeRng;     //!< Packet size.
-  Ptr<RandomVariableStream>   m_lengthRng;      //!< Traffic length.
   uint8_t                     m_sliceId;        //!< Slice Id.
   QosType                     m_qosType;        //!< Traffic QoS type.
   EventId                     m_sendEvent;      //!< SendPacket event.

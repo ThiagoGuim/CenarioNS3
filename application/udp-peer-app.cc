@@ -66,20 +66,15 @@ UdpPeerApp::GetTypeId (void)
                    StringValue ("ns3::ConstantRandomVariable[Constant=1000]"),
                    MakePointerAccessor (&UdpPeerApp::m_pktSizeRng),
                    MakePointerChecker <RandomVariableStream> ())
-    .AddAttribute ("TrafficLength",
-                   "A random variable for the traffic length [s].",
-                   StringValue ("ns3::ConstantRandomVariable[Constant=60]"),
-                   MakePointerAccessor (&UdpPeerApp::m_lengthRng),
-                   MakePointerChecker <RandomVariableStream> ())
-    .AddAttribute ("SliceId", "Slice identifier.",
-                   UintegerValue (0),
-                   MakeUintegerAccessor (&UdpPeerApp::m_sliceId),
-                   MakeUintegerChecker<uint8_t> ())
     .AddAttribute ("QosType", "Traffic QoS indicator.",
                    EnumValue (QosType::NON),
                    MakeEnumAccessor (&UdpPeerApp::m_qosType),
                    MakeEnumChecker (QosType::NON, QosTypeStr (QosType::NON),
                                     QosType::GBR, QosTypeStr (QosType::GBR)))
+    .AddAttribute ("SliceId", "Slice identifier.",
+                   UintegerValue (0),
+                   MakeUintegerAccessor (&UdpPeerApp::m_sliceId),
+                   MakeUintegerChecker<uint8_t> ())
 
     .AddTraceSource ("RxPkt", "Trace source for received packets.",
                      MakeTraceSourceAccessor (&UdpPeerApp::m_rxTrace),
@@ -102,11 +97,14 @@ UdpPeerApp::StartTraffic (void)
   m_sendEvent.Cancel ();
   Time sendTime = Seconds (std::abs (m_pktInterRng->GetValue ()));
   m_sendEvent = Simulator::Schedule (sendTime, &UdpPeerApp::SendPacket, this);
+}
 
-  // Schedule the application to stop.
-  m_stopEvent.Cancel ();
-  Time stopTime = Seconds (std::abs (m_lengthRng->GetValue ()));
-  m_stopEvent = Simulator::Schedule (stopTime, &UdpPeerApp::StopApplication, this);
+void
+UdpPeerApp::StopTraffic (void)
+{
+  NS_LOG_FUNCTION (this);
+
+  StopApplication ();
 }
 
 void
