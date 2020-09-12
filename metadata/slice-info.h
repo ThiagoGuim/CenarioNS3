@@ -23,6 +23,7 @@
 #define SLICE_INFO_H
 
 #include <ns3/core-module.h>
+#include "../application/udp-peer-helper.h"
 
 namespace ns3 {
 
@@ -74,6 +75,12 @@ public:
   //\}
 
   /**
+   * Get the application helper to configure the traffic for this slice.
+   * \return The application helper.
+   */
+  Ptr<UdpPeerHelper> GetAppHelper (void);
+
+  /**
    * Get the number of slices.
    * \return The number of slices
    */
@@ -114,12 +121,13 @@ private:
    */
   static void RegisterSliceInfo (Ptr<SliceInfo> sliceInfo);
 
-  bool     m_sharing;      //!< Slice sharing bandwitdh.
-  uint16_t m_sliceId;      //!< Slice identifier.
-  uint16_t m_prio;         //!< Slice priority.
-  uint16_t m_quota;        //!< Slice quota.
-  uint16_t m_numHostsA;    //!< Number of hosts attached to switch A.
-  uint16_t m_numHostsB;    //!< Number of hosts attached to switch B.
+  bool                m_sharing;    //!< Slice sharing bandwitdh.
+  uint16_t            m_sliceId;    //!< Slice identifier.
+  uint16_t            m_prio;       //!< Slice priority.
+  uint16_t            m_quota;      //!< Slice quota.
+  uint16_t            m_numHostsA;  //!< Number of hosts attached to switch A.
+  uint16_t            m_numHostsB;  //!< Number of hosts attached to switch B.
+  Ptr<UdpPeerHelper>  m_appHelper;  //!< Application helper for this slice.
 
   /**
    * Map saving slice ID / slice information.

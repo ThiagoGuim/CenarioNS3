@@ -76,6 +76,11 @@ SliceInfo::GetTypeId (void)
                    UintegerValue (0),
                    MakeUintegerAccessor (&SliceInfo::m_numHostsB),
                    MakeUintegerChecker<uint16_t> (0, 255))
+    .AddAttribute ("AppHelper", "Application helper for traffic configuration.",
+                   TypeId::ATTR_GET | TypeId::ATTR_CONSTRUCT,
+                   PointerValue (),
+                   MakePointerAccessor (&SliceInfo::m_appHelper),
+                   MakePointerChecker<UdpPeerHelper> ())
   ;
   return tid;
 }
@@ -170,6 +175,12 @@ SliceInfo::GetNumHostsC (void) const
   return m_numHostsA + m_numHostsB;
 }
 
+Ptr<UdpPeerHelper>
+SliceInfo::GetAppHelper (void)
+{
+  return m_appHelper;
+}
+
 bool
 SliceInfo::PriorityComparator (Ptr<SliceInfo> slice1, Ptr<SliceInfo> slice2)
 {
@@ -179,6 +190,7 @@ SliceInfo::PriorityComparator (Ptr<SliceInfo> slice1, Ptr<SliceInfo> slice2)
 void
 SliceInfo::DoDispose ()
 {
+  m_appHelper = 0;
   Object::DoDispose ();
 }
 
@@ -186,11 +198,6 @@ void
 SliceInfo::NotifyConstructionCompleted (void)
 {
   NS_LOG_FUNCTION (this);
-
-  // Creating host nodes
-  // m_nodesA.Create (m_numHostsA);
-  // m_nodesB.Create (m_numHostsB);
-  // m_nodesC.Create (m_numHostsA + m_numHostsB);
 
   RegisterSliceInfo (Ptr<SliceInfo> (this));
   Object::NotifyConstructionCompleted ();
