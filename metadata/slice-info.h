@@ -51,6 +51,7 @@ public:
    * \param value The value to set.
    */
   //\{
+  void SetSharing     (bool value);
   void SetSliceId     (uint16_t value);
   void SetPriority    (uint16_t value);
   void SetQuota       (uint16_t value);
@@ -63,6 +64,7 @@ public:
    * \return The requested information.
    */
   //\{
+  bool     GetSharing     (void) const;
   uint16_t GetSliceId     (void) const;
   uint16_t GetPriority    (void) const;
   uint16_t GetQuota       (void) const;
@@ -106,6 +108,7 @@ private:
    */
   static void RegisterSliceInfo (Ptr<SliceInfo> sliceInfo);
 
+  bool     m_sharing;      //!< Slice sharing bandwitdh.
   uint16_t m_sliceId;      //!< Slice identifier.
   uint16_t m_prio;         //!< Slice priority.
   uint16_t m_quota;        //!< Slice quota.

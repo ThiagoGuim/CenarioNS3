@@ -60,6 +60,12 @@ SliceInfo::GetTypeId (void)
                    UintegerValue (0),
                    MakeUintegerAccessor (&SliceInfo::m_quota),
                    MakeUintegerChecker<uint16_t> (1, 100))
+    .AddAttribute ("Sharing", "Enable bandwidth sharing.",
+                   TypeId::ATTR_GET | TypeId::ATTR_CONSTRUCT,
+                   EnumValue (OpMode::ON),
+                   MakeEnumAccessor (&SliceInfo::m_sharing),
+                   MakeEnumChecker (OpMode::OFF, OpModeStr (OpMode::OFF),
+                                    OpMode::ON,  OpModeStr (OpMode::ON)))
     .AddAttribute ("NumHostsA", "Number of hosts attached to switch A.",
                    TypeId::ATTR_GET | TypeId::ATTR_CONSTRUCT,
                    UintegerValue (0),
@@ -99,6 +105,14 @@ SliceInfo::SetQuota (uint16_t value)
 }
 
 void
+SliceInfo::SetSharing (bool value)
+{
+  NS_LOG_FUNCTION (this << value);
+
+  m_sharing = value;
+}
+
+void
 SliceInfo::SetNumHostsA (uint16_t value)
 {
   NS_LOG_FUNCTION (this << value);
@@ -130,6 +144,12 @@ uint16_t
 SliceInfo::GetQuota (void) const
 {
   return m_quota;
+}
+
+bool
+SliceInfo::GetSharing (void) const
+{
+  return m_sharing;
 }
 
 uint16_t
