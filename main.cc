@@ -65,7 +65,6 @@ void ForceDefaults      (void);
 void EnableProgress     (int);
 void EnableVerbose      (bool);
 void EnableOfsLogs      (bool);
-void CreateAnimation    (bool);
 
 /*****************************************************************************/
 int
@@ -338,55 +337,6 @@ main (int argc, char *argv[])
   return 0;
 }
 /*****************************************************************************/
-
-
-void
-CreateAnimation (bool animation)
-{
-  if (animation)
-    {
-      // // Create the animation object and configure for specified output
-      // std::string animFile = "animation.xml";
-
-      // Ptr<ListPositionAllocator> listPosAllocator;
-      // listPosAllocator = CreateObject<ListPositionAllocator> ();
-
-      // listPosAllocator->Add (Vector (  75, 25, 0)); // Switch A
-      // listPosAllocator->Add (Vector ( 100, 25, 0)); // Switch B
-      // listPosAllocator->Add (Vector ( 125, 25, 0)); // Switch C
-      // listPosAllocator->Add (Vector ( 100, 50, 0)); // Controller
-
-      // NodeContainer allHosts;
-      // NodeContainer allServers;
-
-      // int start = 0;
-      // for (size_t i = 0; i < numberSlices; i ++)
-      // {
-
-      //   size_t j = 0;
-
-      //   for (j = 0; j < sliceNodes[i][ALL_HOSTS].GetN (); j ++)  //Clients-hosts
-      //   {
-      //     listPosAllocator->Add (Vector (0, (start + 25 * j), 0));
-      //   }
-
-      //   for (j = 0; j < sliceNodes[i][SERVERS].GetN (); j++)   //Servers
-      //     {
-      //       listPosAllocator->Add (Vector (200, (start + 25 * j), 0));
-      //     }
-
-      //   start = start + (25 * j);
-
-      //   allHosts.Add (sliceNodes[i][ALL_HOSTS]);
-      //   allServers.Add (sliceNodes[i][SERVERS]);
-      // }
-
-      // MobilityHelper mobilityHelper;
-      // mobilityHelper.SetMobilityModel ("ns3::ConstantPositionMobilityModel");
-      // mobilityHelper.SetPositionAllocator (listPosAllocator);
-      // mobilityHelper.Install (NodeContainer (switches, controllerNode, allHosts, allServers));
-    }
-}
 
 void
 ForceDefaults (void)
