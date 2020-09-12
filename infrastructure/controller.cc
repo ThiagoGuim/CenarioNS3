@@ -28,7 +28,6 @@ namespace ns3 {
 NS_LOG_COMPONENT_DEFINE ("Controller");
 NS_OBJECT_ENSURE_REGISTERED (Controller);
 
-/********** Public methods ***********/
 Controller::Controller ()
 {
   NS_LOG_FUNCTION (this);
@@ -46,50 +45,36 @@ Controller::GetTypeId (void)
     .SetParent<OFSwitch13Controller> ()
     .AddConstructor<Controller> ()
 
-    .AddAttribute ("ExtraStep",
-                   "Extra bit rate adjustment step.",
+    .AddAttribute ("ExtraStep", "Extra bit rate adjustment step.",
                    DataRateValue (DataRate ("12Mbps")),
                    MakeDataRateAccessor (&Controller::m_extraStep),
                    MakeDataRateChecker ())
-    .AddAttribute ("GuardStep",
-                   "Link guard bit rate.",
+    .AddAttribute ("GuardStep", "Link guard bit rate.",
                    DataRateValue (DataRate ("10Mbps")),
                    MakeDataRateAccessor (&Controller::m_guardStep),
                    MakeDataRateChecker ())
-    .AddAttribute ("MeterStep",
-                   "Meter bit rate adjustment step.",
-                   DataRateValue (DataRate ("2Mbps")),
+    .AddAttribute ("MeterStep", "Meter bit rate adjustment step.",
+                   DataRateValue (DataRate ("1Mbps")),
                    MakeDataRateAccessor (&Controller::m_meterStep),
                    MakeDataRateChecker ())
-
-    .AddAttribute ("SliceMode",
-                   "Inter-slice operation mode.",
+    .AddAttribute ("SliceMode", "Inter-slice operation mode.",
                    TypeId::ATTR_GET | TypeId::ATTR_CONSTRUCT,
                    EnumValue (SliceMode::DYNA),
                    MakeEnumAccessor (&Controller::m_sliceMode),
-                   MakeEnumChecker (SliceMode::NONE,
-                                    SliceModeStr (SliceMode::NONE),
-                                    SliceMode::SHAR,
-                                    SliceModeStr (SliceMode::SHAR),
-                                    SliceMode::STAT,
-                                    SliceModeStr (SliceMode::STAT),
-                                    SliceMode::DYNA,
-                                    SliceModeStr (SliceMode::DYNA)))
-    .AddAttribute ("SliceTimeout",
-                   "Inter-slice adjustment timeout.",
+                   MakeEnumChecker (SliceMode::NONE, SliceModeStr (SliceMode::NONE),
+                                    SliceMode::SHAR, SliceModeStr (SliceMode::SHAR),
+                                    SliceMode::STAT, SliceModeStr (SliceMode::STAT),
+                                    SliceMode::DYNA, SliceModeStr (SliceMode::DYNA)))
+    .AddAttribute ("SliceTimeout", "Inter-slice adjustment timeout.",
                    TimeValue (Seconds (20)),
                    MakeTimeAccessor (&Controller::m_sliceTimeout),
                    MakeTimeChecker ())
-
-    .AddAttribute ("SpareUse",
-                   "Use spare link bit rate for sharing purposes.",
+    .AddAttribute ("SpareUse", "Use spare link bit rate for sharing purposes.",
                    TypeId::ATTR_GET | TypeId::ATTR_CONSTRUCT,
                    EnumValue (OpMode::ON),
                    MakeEnumAccessor (&Controller::m_spareUse),
                    MakeEnumChecker (OpMode::OFF, OpModeStr (OpMode::OFF),
                                     OpMode::ON,  OpModeStr (OpMode::ON)))
-
-
   ;
   return tid;
 }
@@ -108,9 +93,9 @@ Controller::NotifyHost (
       << " goto:2";
   DpctlExecute (swPort->GetSwitchDevice ()->GetDpId (), cmd.str ());
 
-  NS_LOG_INFO ("Host IP " << Ipv4AddressHelper::GetAddress (hostDev) <<
+  NS_LOG_INFO ("Host IPv4 address " << Ipv4AddressHelper::GetAddress (hostDev) <<
                " connected to port " << swPort->GetPortNo () <<
-               " at switch id " << swPort->GetSwitchDevice ()->GetDpId ());
+               " at switch with id " << swPort->GetSwitchDevice ()->GetDpId ());
 }
 
 void
@@ -127,9 +112,9 @@ Controller::NotifySwitches (
   // Switch A - right (to switch B)
   std::ostringstream cmd1;
   cmd1 << "flow-mod cmd=add,table=0,prio=500"
-      << " eth_type=0x0800,ip_dst=10.0.2.0/255.0.255.0"
-      << " write:output=" << switchesPorts.at (0)->GetPortNo ()
-      << " goto:1";
+       << " eth_type=0x0800,ip_dst=10.0.2.0/255.0.255.0"
+       << " write:output=" << switchesPorts.at (0)->GetPortNo ()
+       << " goto:1";
   DpctlExecute (switchDevices.Get (0)->GetDpId (), cmd1.str ());
 
   // Switch B - left (to switch A)
@@ -155,17 +140,6 @@ Controller::NotifySwitches (
        << " write:output=" << switchesPorts.at (3)->GetPortNo ()
        << " goto:1";
   DpctlExecute (switchDevices.Get (2)->GetDpId (), cmd4.str ());
-
-  // Get the pointers to link informations // FIXME
-  m_lInfoA = LinkInfo::GetPointer (1, 2);
-  m_lInfoB = LinkInfo::GetPointer (2, 3);
-}
-
-// Comparator for slice priorities.
-bool
-PriComp (Ptr<SliceInfo> slice1, Ptr<SliceInfo> slice2)
-{
-  return slice1->GetPriority () < slice2->GetPriority ();
 }
 
 void
@@ -173,64 +147,73 @@ Controller::NotifySlices (SliceInfoList_t slices)
 {
   NS_LOG_FUNCTION (this << slices);
 
-  std::stable_sort (slices.begin (), slices.end (),
-                    SliceInfo::PriorityComparator);
-
-  // Iterate over slices to dump informpation.
-  for (auto const &sInfo : slices)
+  // Iterate over slices
+  for (auto const &slice : slices)
     {
-      std::cout << "SliceId = "   << sInfo->GetSliceId ()   << " | ";
-      std::cout << "Prio = "      << sInfo->GetPriority ()  << " | ";
-      std::cout << "Quota = "     << sInfo->GetQuota ()     << " | ";
-      std::cout << "NumHostsA = " << sInfo->GetNumHostsA () << " | ";
-      std::cout << "NumHostsB = " << sInfo->GetNumHostsB () << std::endl;
-    }
-  return;
-
-  for (std::vector<Ptr<SliceInfo>>::iterator it = slices.begin (); it != slices.end (); ++it)
-    {
-      // Install slicing meters in both link directions.
-      for (int d = 0; d < N_LINK_DIRS; d++)
+      // Saving slices for further usage on this controller.
+      m_slicesAll.push_back (slice);
+      if (slice->GetSharing () == OpMode::ON)
         {
-          LinkInfo::LinkDir dir = static_cast<LinkInfo::LinkDir> (d);
+          m_slicesSha.push_back (slice);
+        }
 
+      // Iterate over links and configure the initial quotas.
+      for (auto const &link : LinkInfo::GetList ())
+        {
           bool success = true;
-          success &= m_lInfoA->UpdateQuota (dir, (*it)->GetSliceId (), (*it)->GetQuota ());
-          success &= m_lInfoB->UpdateQuota (dir, (*it)->GetSliceId (), (*it)->GetQuota ());
+          success &= link->UpdateQuota (LinkInfo::FWD, slice->GetSliceId (), slice->GetQuota ());
+          success &= link->UpdateQuota (LinkInfo::BWD, slice->GetSliceId (), slice->GetQuota ());
           NS_ASSERT_MSG (success, "Error when setting slice quotas.");
-
         }
     }
 
-  // ---------------------------------------------------------------------
-  // Meter table
-  //
-  // Install inter-slicing meters, depending on the InterSliceMode attribute.
+  // Sort slice in increasing priority order.
+  std::stable_sort (m_slicesAll.begin (), m_slicesAll.end (), SliceInfo::PriorityComparator);
+  std::stable_sort (m_slicesSha.begin (), m_slicesSha.end (), SliceInfo::PriorityComparator);
+
+  // Iterate over slices in increasing priority order and dump information.
+  for (auto const &slice : m_slicesAll)
+    {
+      std::cout << "SliceId = "   << slice->GetSliceId ()   << " | ";
+      std::cout << "Prio = "      << slice->GetPriority ()  << " | ";
+      std::cout << "Quota = "     << slice->GetQuota ()     << " | ";
+      std::cout << "Sharing = "   << slice->GetSharing ()   << " | ";
+      std::cout << "NumHostsA = " << slice->GetNumHostsA () << " | ";
+      std::cout << "NumHostsB = " << slice->GetNumHostsB () << std::endl;
+    }
+
+  // Install inter-slicing meters, depending on the SliceMode attribute.
   switch (m_sliceMode)
     {
     case SliceMode::NONE:
-      // Nothing to do when inter-slicing is disabled.
+      // No meter to install when inter-slicing is disabled.
       return;
 
     case SliceMode::SHAR:
-      for (auto &lInfo : LinkInfo::GetList ())
+      for (auto const &link : LinkInfo::GetList ())
         {
           // Install high-priority individual Non-GBR meter entries for slices
           // with disabled bandwidth sharing and the low-priority shared
           // Non-GBR meter entry for other slices.
-          SlicingMeterInstall (lInfo, SLICE_ALL);
-
+          SlicingMeterInstall (link, SLICE_ALL);
+          for (auto const &slice : GetSliceList ())
+            {
+              if (slice->GetSharing () == OpMode::OFF)
+                {
+                  SlicingMeterInstall (link, slice->GetSliceId ());
+                }
+            }
         }
       break;
 
     case SliceMode::STAT:
     case SliceMode::DYNA:
-      for (auto &lInfo : LinkInfo::GetList ())
+      for (auto const &link : LinkInfo::GetList ())
         {
-          // Install individual Non-GBR meter entries.
-          for (size_t slc = 0; slc < m_numberSlices; slc++)
+          // Install individual Non-GBR meter entries for all slices.
+          for (auto const &slice : GetSliceList ())
             {
-              SlicingMeterInstall (lInfo, slc);
+              SlicingMeterInstall (link, slice->GetSliceId ());
             }
         }
       break;
@@ -239,27 +222,39 @@ Controller::NotifySlices (SliceInfoList_t slices)
       NS_LOG_WARN ("Undefined inter-slicing operation mode.");
       break;
     }
-
-  //
-  for (size_t sliceId = 0; sliceId < m_numberSlices; sliceId++)
-    {
-      // Install slicing meters in both link directions.
-      SlicingMeterApply (m_lInfoA, sliceId);
-      SlicingMeterApply (m_lInfoB, sliceId);
-    }
-
-
 }
 
+const SliceInfoList_t&
+Controller::GetSliceList (bool sharing) const
+{
+  NS_LOG_FUNCTION (this << sharing);
 
-/********** Protected methods **********/
+  return (sharing ? m_slicesSha : m_slicesAll);
+}
 
 void
 Controller::DoDispose ()
 {
   NS_LOG_FUNCTION (this);
 
+  m_slicesAll.clear ();
+  m_slicesSha.clear ();
   OFSwitch13Controller::DoDispose ();
+}
+
+void
+Controller::NotifyConstructionCompleted (void)
+{
+  NS_LOG_FUNCTION (this);
+
+  // Schedule the first slicing extra timeout operation only when in
+  // dynamic inter-slicing operation mode.
+  if (m_sliceMode == SliceMode::DYNA)
+    {
+      Simulator::Schedule (m_sliceTimeout, &Controller::SlicingDynamicTimeout, this);
+    }
+
+  OFSwitch13Controller::NotifyConstructionCompleted ();
 }
 
 ofl_err
@@ -339,15 +334,15 @@ Controller::HandshakeSuccessful (Ptr<const RemoteSwitch> swtch)
   // OFPP_CONTROLLER logical port.
   DpctlExecute (swDpId, "set-config miss=128");
 
-  // After a successfull handshake, let's install the table-miss entries.
+  // Install the table-miss entries.
   DpctlExecute (swDpId, "flow-mod cmd=add,table=0,prio=0 apply:output=ctrl:128");
   DpctlExecute (swDpId, "flow-mod cmd=add,table=1,prio=0 goto:2");
   DpctlExecute (swDpId, "flow-mod cmd=add,table=2,prio=0 ");
 
-  // Flooding all ARP packets
+  // Flood all ARP packets
   DpctlExecute (swDpId, "flow-mod cmd=add,table=0,prio=10 eth_type=0x0806 apply:output=flood");
 
-  // QoS output queues rules.
+  // Install rules for QoS output queues.
   for (auto const &it : Dscp2QueueMap ())
     {
       std::ostringstream cmd;
@@ -361,19 +356,17 @@ Controller::HandshakeSuccessful (Ptr<const RemoteSwitch> swtch)
     }
 }
 
-/********** Private methods **********/
-
 void
 Controller::SlicingDynamicTimeout (void)
 {
   NS_LOG_FUNCTION (this);
 
   // Adjust the extra bit rates in both directions for each backhaul link.
-  for (auto &lInfo : LinkInfo::GetList ())
+  for (auto &link : LinkInfo::GetList ())
     {
       for (int d = 0; d < N_LINK_DIRS; d++)
         {
-          SlicingExtraAdjust (lInfo, static_cast<LinkInfo::LinkDir> (d));
+          SlicingExtraAdjust (link, static_cast<LinkInfo::LinkDir> (d));
         }
     }
 
@@ -383,173 +376,179 @@ Controller::SlicingDynamicTimeout (void)
 
 void
 Controller::SlicingExtraAdjust (
-  Ptr<LinkInfo> lInfo, LinkInfo::LinkDir dir)
+  Ptr<LinkInfo> link, LinkInfo::LinkDir dir)
 {
-  NS_LOG_FUNCTION (this << lInfo << dir);
+  NS_LOG_FUNCTION (this << link << dir);
 
-//   NS_ASSERT_MSG (m_sliceMode == SliceMode::DYNA,
-//                  "Invalid inter-slice operation mode.");
+  NS_ASSERT_MSG (m_sliceMode == SliceMode::DYNA, "Invalid inter-slice operation mode.");
 
-//   const LinkInfo::EwmaTerm lTerm = LinkInfo::LTERM;
-//   int64_t stepRate = static_cast<int64_t> (m_extraStep.GetBitRate ());
-//   NS_ASSERT_MSG (stepRate > 0, "Invalid ExtraStep attribute value.");
+  int64_t stepRate = static_cast<int64_t> (m_extraStep.GetBitRate ());
+  NS_ASSERT_MSG (stepRate > 0, "Invalid ExtraStep attribute value.");
 
-//   // Iterate over slices with enabled bandwidth sharing
-//   // to sum the quota bit rate and the used bit rate.
-//   int64_t maxShareBitRate = 0;
-//   int64_t useShareBitRate = 0;
-//   for (auto const &ctrl : GetSliceControllerList (true))
-//     {
-//       SliceId slice = ctrl->GetSliceId ();
-//       maxShareBitRate += lInfo->GetQuoBitRate (dir, slice);
-//       useShareBitRate += lInfo->GetUseBitRate (lTerm, dir, slice);
-//     }
-//   // When enable, sum the spare bit rate too.
-//   if (m_spareUse == OpMode::ON)
-//     {
-//       maxShareBitRate += lInfo->GetQuoBitRate (dir, SliceId::UNKN);
-//     }
+  // Iterate over slices with enabled bandwidth sharing
+  // to sum the quota bit rate and the used bit rate.
+  int64_t maxShareBitRate = 0;
+  int64_t useShareBitRate = 0;
+  for (auto const &slice : GetSliceList (true))
+    {
+      maxShareBitRate += link->GetQuoBitRate (dir, slice->GetSliceId ());
+      useShareBitRate += link->GetUseBitRate (dir, slice->GetSliceId ());
+    }
+  // When enable, sum the spare bit rate too.
+  if (m_spareUse == OpMode::ON)
+    {
+      maxShareBitRate += link->GetQuoBitRate (dir, SLICE_UNKN);
+    }
 
-//   // Get the idle bit rate (apart from the guard bit rate) that can be used as
-//   // extra bit rate by overloaded slices.
-//   int64_t guardBitRate = static_cast<int64_t> (m_guardStep.GetBitRate ());
-//   int64_t idlShareBitRate = maxShareBitRate - guardBitRate - useShareBitRate;
+  // Get the idle bit rate (apart from the guard bit rate) that can be used as
+  // extra bit rate by overloaded slices.
+  int64_t guardBitRate = static_cast<int64_t> (m_guardStep.GetBitRate ());
+  int64_t idlShareBitRate = maxShareBitRate - guardBitRate - useShareBitRate;
 
-//   if (idlShareBitRate > 0)
-//     {
-//       // We have some unused bit rate step that can be distributed as extra to
-//       // any overloaded slice. Iterate over slices with enabled bandwidth
-//       // sharing in decreasing priority order, assigning one extra bit rate to
-//       // those slices that may benefit from it. Also, gets back one extra bit
-//       // rate from underloaded slices to reduce unnecessary overbooking.
-//       for (auto it = m_sliceCtrlsSha.rbegin ();
-//            it != m_sliceCtrlsSha.rend (); ++it)
-//         {
-//           // Get the idle and extra bit rates for this slice.
-//           SliceId slice = (*it)->GetSliceId ();
-//           int64_t sliceIdl = lInfo->GetIdlBitRate (lTerm, dir, slice);
-//           int64_t sliceExt = lInfo->GetExtBitRate (dir, slice);
-//           NS_LOG_DEBUG ("Current slice " << SliceIdStr (slice) <<
-//                         " direction "    << LinkInfo::LinkDirStr (dir) <<
-//                         " extra "        << sliceExt <<
-//                         " idle "         << sliceIdl);
+  if (idlShareBitRate > 0)
+    {
+      // We have some unused bit rate step that can be distributed as extra to
+      // any overloaded slice. Iterate over slices with enabled bandwidth
+      // sharing in decreasing priority order, assigning one extra bit rate to
+      // those slices that may benefit from it. Also, gets back one extra bit
+      // rate from underloaded slices to reduce unnecessary overbooking.
+      for (auto it = m_slicesSha.rbegin (); it != m_slicesSha.rend (); ++it)
+        {
+          // Get the idle and extra bit rates for this slice.
+          uint16_t sliceId = (*it)->GetSliceId ();
+          int64_t sliceIdl = link->GetIdlBitRate (dir, sliceId);
+          int64_t sliceExt = link->GetExtBitRate (dir, sliceId);
+          NS_LOG_DEBUG ("Current slice " << sliceId <<
+                        " direction "    << LinkInfo::LinkDirStr (dir) <<
+                        " extra "        << sliceExt <<
+                        " idle "         << sliceIdl);
 
-//           if (sliceIdl < (stepRate / 2) && idlShareBitRate >= stepRate)
-//             {
-//               // This is an overloaded slice and we have idle bit rate.
-//               // Increase the slice extra bit rate by one step.
-//               NS_LOG_DEBUG ("Increase extra bit rate.");
-//               bool success = lInfo->UpdateExtBitRate (dir, slice, stepRate);
-//               NS_ASSERT_MSG (success, "Error when updating extra bit rate.");
-//               idlShareBitRate -= stepRate;
-//             }
-//           else if (sliceIdl >= (stepRate * 2) && sliceExt >= stepRate)
-//             {
-//               // This is an underloaded slice with some extra bit rate.
-//               // Decrease the slice extra bit rate by one step.
-//               NS_LOG_DEBUG ("Decrease extra bit rate overbooking.");
-//               bool success = lInfo->UpdateExtBitRate (dir, slice, -stepRate);
-//               NS_ASSERT_MSG (success, "Error when updating extra bit rate.");
-//             }
-//         }
-//     }
-//   else
-//     {
-//       // Link usage is over the safeguard threshold. First, iterate over slices
-//       // with enable bandwidth sharing and get back any unused extra bit rate
-//       // to reduce unnecessary overbooking.
-//       for (auto const &ctrl : GetSliceControllerList (true))
-//         {
-//           // Get the idle and extra bit rates for this slice.
-//           SliceId slice = ctrl->GetSliceId ();
-//           int64_t sliceIdl = lInfo->GetIdlBitRate (lTerm, dir, slice);
-//           int64_t sliceExt = lInfo->GetExtBitRate (dir, slice);
-//           NS_LOG_DEBUG ("Current slice " << SliceIdStr (slice) <<
-//                         " direction "    << LinkInfo::LinkDirStr (dir) <<
-//                         " extra "        << sliceExt <<
-//                         " idle "         << sliceIdl);
+          if (sliceIdl < (stepRate / 2) && idlShareBitRate >= stepRate)
+            {
+              // This is an overloaded slice and we have idle bit rate.
+              // Increase the slice extra bit rate by one step.
+              NS_LOG_DEBUG ("Increase extra bit rate.");
+              bool success = link->UpdateExtBitRate (dir, sliceId, stepRate);
+              NS_ASSERT_MSG (success, "Error when updating extra bit rate.");
+              idlShareBitRate -= stepRate;
+            }
+          else if (sliceIdl >= (stepRate * 2) && sliceExt >= stepRate)
+            {
+              // This is an underloaded slice with some extra bit rate.
+              // Decrease the slice extra bit rate by one step.
+              NS_LOG_DEBUG ("Decrease extra bit rate overbooking.");
+              bool success = link->UpdateExtBitRate (dir, sliceId, -stepRate);
+              NS_ASSERT_MSG (success, "Error when updating extra bit rate.");
+            }
+        }
+    }
+  else
+    {
+      // Link usage is over the safeguard threshold. First, iterate over slices
+      // with enable bandwidth sharing and get back any unused extra bit rate
+      // to reduce unnecessary overbooking.
+      for (auto const &slice : GetSliceList (true))
+        {
+          // Get the idle and extra bit rates for this slice.
+          uint16_t sliceId = slice->GetSliceId ();
+          int64_t sliceIdl = link->GetIdlBitRate (dir, sliceId);
+          int64_t sliceExt = link->GetExtBitRate (dir, sliceId);
+          NS_LOG_DEBUG ("Current slice " << sliceId <<
+                        " direction "    << LinkInfo::LinkDirStr (dir) <<
+                        " extra "        << sliceExt <<
+                        " idle "         << sliceIdl);
 
-//           // Remove all unused extra bit rate (step by step) from this slice.
-//           while (sliceIdl >= stepRate && sliceExt >= stepRate)
-//             {
-//               NS_LOG_DEBUG ("Decrease extra bit rate overbooking.");
-//               bool success = lInfo->UpdateExtBitRate (dir, slice, -stepRate);
-//               NS_ASSERT_MSG (success, "Error when updating extra bit rate.");
-//               sliceIdl -= stepRate;
-//               sliceExt -= stepRate;
-//             }
-//         }
+          // Remove all unused extra bit rate (step by step) from this slice.
+          while (sliceIdl >= stepRate && sliceExt >= stepRate)
+            {
+              NS_LOG_DEBUG ("Decrease extra bit rate overbooking.");
+              bool success = link->UpdateExtBitRate (dir, sliceId, -stepRate);
+              NS_ASSERT_MSG (success, "Error when updating extra bit rate.");
+              sliceIdl -= stepRate;
+              sliceExt -= stepRate;
+            }
+        }
 
-//       // At this point there is no slices with more than one step of unused
-//       // extra bit rate. Now, iterate again over slices with enabled bandwidth
-//       // sharing in increasing priority order, removing some extra bit rate
-//       // from those slices that are using more than its quota to get the link
-//       // usage below the safeguard threshold again.
-//       bool removedFlag = false;
-//       auto it = m_sliceCtrlsSha.begin ();
-//       auto sp = m_sliceCtrlsSha.begin ();
-//       while (it != m_sliceCtrlsSha.end () && idlShareBitRate < 0)
-//         {
-//           // Check if the slice priority has increased to update the sp.
-//           if ((*it)->GetPriority () > (*sp)->GetPriority ())
-//             {
-//               NS_ASSERT_MSG (!removedFlag, "Inconsistent removed flag.");
-//               sp = it;
-//             }
+      // At this point there is no slices with more than one step of unused
+      // extra bit rate. Now, iterate again over slices with enabled bandwidth
+      // sharing in increasing priority order, removing some extra bit rate
+      // from those slices that are using more than its quota to get the link
+      // usage below the safeguard threshold again.
+      bool removedFlag = false;
+      auto it = m_slicesSha.begin ();
+      auto sp = m_slicesSha.begin ();
+      while (it != m_slicesSha.end () && idlShareBitRate < 0)
+        {
+          // Check if the slice priority has increased to update the sp.
+          if ((*it)->GetPriority () > (*sp)->GetPriority ())
+            {
+              NS_ASSERT_MSG (!removedFlag, "Inconsistent removed flag.");
+              sp = it;
+            }
 
-//           // Get the idle and extra bit rates for this slice.
-//           SliceId slice = (*it)->GetSliceId ();
-//           int64_t sliceIdl = lInfo->GetIdlBitRate (lTerm, dir, slice);
-//           int64_t sliceExt = lInfo->GetExtBitRate (dir, slice);
-//           NS_LOG_DEBUG ("Current slice " << SliceIdStr (slice) <<
-//                         " direction "    << LinkInfo::LinkDirStr (dir) <<
-//                         " extra "        << sliceExt <<
-//                         " idle "         << sliceIdl);
+          // Get the idle and extra bit rates for this slice.
+          uint16_t sliceId = (*it)->GetSliceId ();
+          int64_t sliceIdl = link->GetIdlBitRate (dir, sliceId);
+          int64_t sliceExt = link->GetExtBitRate (dir, sliceId);
+          NS_LOG_DEBUG ("Current slice " << sliceId <<
+                        " direction "    << LinkInfo::LinkDirStr (dir) <<
+                        " extra "        << sliceExt <<
+                        " idle "         << sliceIdl);
 
-//           // If possible, decrease the slice extra bit rate by one step.
-//           if (sliceExt >= stepRate)
-//             {
-//               removedFlag = true;
-//               NS_ASSERT_MSG (sliceIdl < stepRate, "Inconsistent bit rate.");
-//               NS_LOG_DEBUG ("Decrease extra bit rate for congested link.");
-//               bool success = lInfo->UpdateExtBitRate (dir, slice, -stepRate);
-//               NS_ASSERT_MSG (success, "Error when updating extra bit rate.");
-//               idlShareBitRate += stepRate - sliceIdl;
-//             }
+          // If possible, decrease the slice extra bit rate by one step.
+          if (sliceExt >= stepRate)
+            {
+              removedFlag = true;
+              NS_ASSERT_MSG (sliceIdl < stepRate, "Inconsistent bit rate.");
+              NS_LOG_DEBUG ("Decrease extra bit rate for congested link.");
+              bool success = link->UpdateExtBitRate (dir, sliceId, -stepRate);
+              NS_ASSERT_MSG (success, "Error when updating extra bit rate.");
+              idlShareBitRate += stepRate - sliceIdl;
+            }
 
-//           // Select the slice for the next loop iteration.
-//           auto nextIt = std::next (it);
-//           bool isLast = (nextIt == m_sliceCtrlsSha.end ());
-//           if ((!isLast && (*nextIt)->GetPriority () == (*it)->GetPriority ())
-//               || (removedFlag == false))
-//             {
-//               // Go to the next slice if it has the same priority of the
-//               // current one or if no more extra bit rate can be recovered from
-//               // slices with the current priority.
-//               it = nextIt;
-//             }
-//           else
-//             {
-//               // Go back to the first slice with the current priority (can be
-//               // the current slice) and reset the removed flag.
-//               NS_ASSERT_MSG (removedFlag, "Inconsistent removed flag.");
-//               it = sp;
-//               removedFlag = false;
-//             }
-//         }
-//     }
+          // Select the slice for the next loop iteration.
+          auto nextIt = std::next (it);
+          bool isLast = (nextIt == m_slicesSha.end ());
+          if ((!isLast && (*nextIt)->GetPriority () == (*it)->GetPriority ())
+              || (removedFlag == false))
+            {
+              // Go to the next slice if it has the same priority of the
+              // current one or if no more extra bit rate can be recovered from
+              // slices with the current priority.
+              it = nextIt;
+            }
+          else
+            {
+              // Go back to the first slice with the current priority (can be
+              // the current slice) and reset the removed flag.
+              NS_ASSERT_MSG (removedFlag, "Inconsistent removed flag.");
+              it = sp;
+              removedFlag = false;
+            }
+        }
+    }
 
-//   // Update the slicing meters for all slices over this link.
-//   for (auto const &ctrl : GetSliceControllerList (true))
-//     {
-//       SlicingMeterAdjust (lInfo, ctrl->GetSliceId ());
-//     }
+  // Update the slicing meters for all slices over this link.
+  for (auto const &slice : GetSliceList (true))
+    {
+      SlicingMeterAdjust (link, slice->GetSliceId ());
+    }
 }
 
 void
-Controller::SlicingMeterApply (Ptr<LinkInfo> lInfo, int sliceId)
+Controller::SlicingMeterApply (Ptr<LinkInfo> link, int sliceId)
 {
-  NS_LOG_FUNCTION (this << lInfo << sliceId);
+  NS_LOG_FUNCTION (this << link << sliceId);
+
+  // Create meter id for both link directions.
+  // FWD direction: switches A -> B -> C
+  // BWD direction: switches A <- B <- C
+  uint32_t meterIdFwd = MeterIdSlcCreate (sliceId, static_cast<int> (LinkInfo::FWD));
+  uint32_t meterIdBwd = MeterIdSlcCreate (sliceId, static_cast<int> (LinkInfo::BWD));
+
+  // Get OpenFlow switch datapath ID for both link directions.
+  uint64_t dpIdFwd = link->GetSwDpId (static_cast<int> (LinkInfo::FWD));
+  uint64_t dpIdBwd = link->GetSwDpId (static_cast<int> (LinkInfo::BWD));
 
   // -------------------------------------------------------------------------
   // Bandwidth table -- [from higher to lower priority]
@@ -558,42 +557,36 @@ Controller::SlicingMeterApply (Ptr<LinkInfo> lInfo, int sliceId)
   // Using a low-priority rule for ALL slice.
   std::ostringstream cmd;
   cmd << "flow-mod cmd=add"
-      << ",prio="       << (sliceId == SLICE_ALL ? 32 : 64)
-      << ",table="      << OFS_TAB_METER
-      << ",flags="      << FLAGS_REMOVED_OVERLAP_RESET;
+      << ",prio="   << (sliceId == SLICE_ALL ? 32 : 64)
+      << ",table="  << OFS_TAB_METER
+      << ",flags="  << FLAGS_REMOVED_OVERLAP_RESET;
 
+  // Build the match string for forward direction.
+  std::ostringstream mtcFwd;
+  mtcFwd << " eth_type="   << IPV4_PROT_NUM
+         << ",ip_dst=10."  << sliceId
+         << ".2.0/255.255.255.0"
+         << " meter:"      << meterIdFwd
+         << " goto:"       << OFS_TAB_QUEUE;
+  DpctlExecute (dpIdFwd, cmd.str () + mtcFwd.str ());
 
-  uint32_t meterId = MeterIdSlcCreate (sliceId, static_cast<int> (LinkInfo::FWD));
-
-  // Build the match string.
-  std::ostringstream mtc;
-  mtc << " eth_type="   << IPV4_PROT_NUM
-      << ",ip_dst=10." << sliceId << ".2.0/255.255.255.0"
-      << " meter:" << meterId
-      << " goto:" << OFS_TAB_QUEUE;
-
-  DpctlExecute (lInfo->GetSwDpId (static_cast<int> (LinkInfo::FWD)), cmd.str () + mtc.str ());
-
-
-  meterId = MeterIdSlcCreate (sliceId, static_cast<int> (LinkInfo::BWD));
-
-  // Build the match string.
-  std::ostringstream mtc1;
-  mtc1 << " eth_type="   << IPV4_PROT_NUM
-       << ",ip_dst=10." << sliceId << ".1.0/255.255.255.0"
-       << " meter:" << meterId
-       << " goto:" << OFS_TAB_QUEUE;
-  DpctlExecute (lInfo->GetSwDpId (static_cast<int> (LinkInfo::BWD)), cmd.str () + mtc1.str ());
-
+  // Build the match string for backward direction.
+  std::ostringstream mtcBwd;
+  mtcBwd << " eth_type="   << IPV4_PROT_NUM
+         << ",ip_dst=10."  << sliceId
+         << ".1.0/255.255.255.0"
+         << " meter:"      << meterIdBwd
+         << " goto:"       << OFS_TAB_QUEUE;
+  DpctlExecute (dpIdBwd, cmd.str () + mtcBwd.str ());
 }
 
 void
 Controller::SlicingMeterAdjust (
-  Ptr<LinkInfo> lInfo, int sliceId)
+  Ptr<LinkInfo> link, int sliceId)
 {
-  NS_LOG_FUNCTION (this << lInfo << sliceId);
+  NS_LOG_FUNCTION (this << link << sliceId);
 
-  // Update inter-slicing meter, depending on the InterSliceMode attribute.
+  // Update inter-slicing meter, depending on the SliceMode attribute.
   NS_ASSERT_MSG (sliceId < SLICE_ALL, "Invalid slice for this operation.");
   switch (m_sliceMode)
     {
@@ -603,8 +596,10 @@ Controller::SlicingMeterAdjust (
 
     case SliceMode::SHAR:
       // Identify the Non-GBR meter entry to adjust: individual or shared.
-      sliceId = SLICE_ALL;
-
+      if (SliceInfo::GetPointer (sliceId)->GetSharing () == OpMode::ON)
+        {
+          sliceId = SLICE_ALL;
+        }
       break;
 
     case SliceMode::STAT:
@@ -622,27 +617,28 @@ Controller::SlicingMeterAdjust (
     {
       LinkInfo::LinkDir dir = static_cast<LinkInfo::LinkDir> (d);
 
+      // Calculate the meter bit rate.
       int64_t meterBitRate = 0;
       if (sliceId == SLICE_ALL)
         {
           // Iterate over slices with enabled bandwidth sharing
           // to sum the quota bit rate.
-          for (size_t slc = 0; slc < m_numberSlices; slc++)
+          for (auto const &slice : GetSliceList (true))
             {
-              meterBitRate += lInfo->GetUnrBitRate (dir, slc);
+              meterBitRate += link->GetUnrBitRate (dir, slice->GetSliceId ());
             }
           // When enable, sum the spare bit rate too.
           if (m_spareUse == OpMode::ON)
             {
-              meterBitRate += lInfo->GetUnrBitRate (dir, SLICE_UNKN);
+              meterBitRate += link->GetUnrBitRate (dir, SLICE_UNKN);
             }
         }
       else
         {
-          meterBitRate = lInfo->GetUnrBitRate (dir, sliceId);
+          meterBitRate = link->GetUnrBitRate (dir, sliceId);
         }
 
-      int64_t currBitRate = lInfo->GetMetBitRate (dir, sliceId);
+      int64_t currBitRate = link->GetMetBitRate (dir, sliceId);
       uint64_t diffBitRate = std::abs (currBitRate - meterBitRate);
       NS_LOG_DEBUG ("Current slice " << sliceId <<
                     " direction "    << LinkInfo::LinkDirStr (dir) <<
@@ -652,7 +648,7 @@ Controller::SlicingMeterAdjust (
         {
           uint32_t meterId = MeterIdSlcCreate (sliceId, d);
           int64_t meterKbps = Bps2Kbps (meterBitRate);
-          bool success = lInfo->SetMetBitRate (dir, sliceId, meterKbps * 1000);
+          bool success = link->SetMetBitRate (dir, sliceId, meterKbps * 1000);
           NS_ASSERT_MSG (success, "Error when setting meter bit rate.");
 
           NS_LOG_INFO ("Update slice " << sliceId <<
@@ -665,15 +661,15 @@ Controller::SlicingMeterAdjust (
               << ",flags="      << OFPMF_KBPS
               << ",meter="      << meterId
               << " drop:rate="  << meterKbps;
-          DpctlExecute (lInfo->GetSwDpId (d), cmd.str ());
+          DpctlExecute (link->GetSwDpId (d), cmd.str ());
         }
     }
 }
 
 void
-Controller::SlicingMeterInstall (Ptr<LinkInfo> lInfo, int sliceId)
+Controller::SlicingMeterInstall (Ptr<LinkInfo> link, int sliceId)
 {
-  NS_LOG_FUNCTION (this << lInfo << sliceId);
+  NS_LOG_FUNCTION (this << link << sliceId);
 
   NS_ASSERT_MSG (m_sliceMode != SliceMode::NONE,
                  "Invalid inter-slice operation mode.");
@@ -683,6 +679,7 @@ Controller::SlicingMeterInstall (Ptr<LinkInfo> lInfo, int sliceId)
     {
       LinkInfo::LinkDir dir = static_cast<LinkInfo::LinkDir> (d);
 
+      // Calculate the meter bit rate.
       int64_t meterBitRate = 0;
       if (sliceId == SLICE_ALL)
         {
@@ -691,24 +688,24 @@ Controller::SlicingMeterInstall (Ptr<LinkInfo> lInfo, int sliceId)
 
           // Iterate over slices with enabled bandwidth sharing
           // to sum the quota bit rate.
-          for (size_t slc = 0; slc < m_numberSlices; slc++)
+          for (auto const &slice : GetSliceList (true))
             {
-              meterBitRate += lInfo->GetQuoBitRate (dir, slc);
+              meterBitRate += link->GetQuoBitRate (dir, slice->GetSliceId ());
             }
           // When enable, sum the spare bit rate too.
           if (m_spareUse == OpMode::ON)
             {
-              meterBitRate += lInfo->GetQuoBitRate (dir, SLICE_UNKN);
+              meterBitRate += link->GetQuoBitRate (dir, SLICE_UNKN);
             }
         }
       else
         {
-          meterBitRate = lInfo->GetQuoBitRate (dir, sliceId);
+          meterBitRate = link->GetQuoBitRate (dir, sliceId);
         }
 
       uint32_t meterId = MeterIdSlcCreate (sliceId, d);
       int64_t meterKbps = Bps2Kbps (meterBitRate);
-      bool success = lInfo->SetMetBitRate (dir, sliceId, meterKbps * 1000);
+      bool success = link->SetMetBitRate (dir, sliceId, meterKbps * 1000);
       NS_ASSERT_MSG (success, "Error when setting meter bit rate.");
 
       NS_LOG_INFO ("Create slice " << sliceId <<
@@ -721,8 +718,11 @@ Controller::SlicingMeterInstall (Ptr<LinkInfo> lInfo, int sliceId)
           << ",flags="      << OFPMF_KBPS
           << ",meter="      << meterId
           << " drop:rate="  << meterKbps;
-      DpctlExecute (lInfo->GetSwDpId (d), cmd.str ());
+      DpctlExecute (link->GetSwDpId (d), cmd.str ());
     }
+
+  // Install the rules to apply the meters we just created.
+  SlicingMeterApply (link, sliceId);
 }
 
 } // namespace ns3

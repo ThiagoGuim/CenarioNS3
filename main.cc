@@ -135,7 +135,7 @@ main (int argc, char *argv[])
 
   // Create the controller node and configure it.
   Ptr<Node> controllerNode = CreateObject<Node> ();
-  Ptr<Controller> controllerApp = CreateObject<Controller>();;
+  Ptr<Controller> controllerApp = CreateObject<Controller>();
   of13Helper->InstallController (controllerNode, controllerApp);
 
   // Create the switch nodes and configure them.
@@ -262,11 +262,14 @@ main (int argc, char *argv[])
       Ipv4Address baseAddressAB (hostsAddrAB.c_str ());
       Ipv4Address baseAddressC (hostsAddrC.c_str ());
 
-      // Set IPv4 host addresses
+      // Set IPv4 host addresses.
+      // Hosts on switches A and B with IP address 10.SLICEID.1.HOSTNUM
       Ipv4AddressHelper ipv4Helper;
       ipv4Helper.SetBase ("10.0.0.0", "255.0.0.0", baseAddressAB);
       hostIpIfacesA = ipv4Helper.Assign (hostDevicesA);
       hostIpIfacesB = ipv4Helper.Assign (hostDevicesB);
+
+      // Hosts on switch C with IP address 10.SLICEID.2.HOSTNUM
       ipv4Helper.SetBase ("10.0.0.0", "255.0.0.0", baseAddressC);
       hostIpIfacesC = ipv4Helper.Assign (hostDevicesC);
 
@@ -539,7 +542,7 @@ EnableVerbose (bool enable)
       LogComponentEnable ("UdpPeerHelper",            logLevelWarn);
 
       // Infrastructure
-      LogComponentEnable ("Controller",               logLevelWarnInfo);
+      LogComponentEnable ("Controller",               logLevelAll);
       LogComponentEnable ("QosQueue",                 logLevelWarn);
 
       // Metadata

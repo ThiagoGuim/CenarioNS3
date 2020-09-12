@@ -34,7 +34,7 @@ namespace ns3 {
 class LinkInfo;
 
 /** A list of link information objects. */
-typedef std::vector<Ptr<LinkInfo>> LinkInfoList_t;
+typedef std::vector<Ptr<LinkInfo> > LinkInfoList_t;
 
 /**
  * \ingroup svelteInfra
@@ -400,7 +400,7 @@ private:
    * Map saving pair of switch datapath IDs / link information.
    * The pair of switch datapath IDs are saved in increasing order.
    */
-  typedef std::map<DpIdPair_t, Ptr<LinkInfo>> LinkInfoMap_t;
+  typedef std::map<DpIdPair_t, Ptr<LinkInfo> > LinkInfoMap_t;
   static LinkInfoMap_t  m_linkInfoByDpIds;      //!< Global link info map.
 
   static LinkInfoList_t m_linkInfoList;         //!< Global link info list.

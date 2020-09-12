@@ -34,7 +34,7 @@ namespace ns3 {
 
 class LinkInfo;
 
-typedef std::vector<Ptr<OFSwitch13Port>> PortsList_t;
+typedef std::vector<Ptr<OFSwitch13Port> > PortsList_t;
 
 /**
  * Our custom controller.
@@ -73,9 +73,19 @@ public:
   void NotifySwitches (OFSwitch13DeviceContainer switchDevices,
                        PortsList_t switchPorts);
 
+  /**
+   * Get the list of slices.
+   * \param sharing Filter slices with enabled bandwdith sharing flag.
+   * \return The list of slices.
+   */
+  const SliceInfoList_t& GetSliceList (bool sharing = false) const;
+
 protected:
   /** Destructor implementation */
   virtual void DoDispose ();
+
+  // Inherited from ObjectBase.
+  virtual void NotifyConstructionCompleted (void);
 
   // Inherited from OFSwitch13Controller.
   virtual ofl_err HandleError (
@@ -98,44 +108,41 @@ private:
   /**
    * Adjust the infrastructure inter-slicing extra bit rate, depending on the
    * ExtraStep attribute value and current link configuration.
-   * \param lInfo The link information.
+   * \param link The link information.
    * \param dir The link direction.
    */
-  void SlicingExtraAdjust (Ptr<LinkInfo> lInfo, LinkInfo::LinkDir dir);
+  void SlicingExtraAdjust (Ptr<LinkInfo> link, LinkInfo::LinkDir dir);
 
   /**
    * Apply the infrastructure inter-slicing OpenFlow meters.
    * \param swtch The switch information.
    * \param slice The network slice.
    */
-  void SlicingMeterApply (Ptr<LinkInfo> lInfo, int sliceId);
+  void SlicingMeterApply (Ptr<LinkInfo> link, int sliceId);
 
   /**
    * Adjust the infrastructure inter-slicing OpenFlow meter, depending on the
    * MeterStep attribute value and current link configuration.
-   * \param lInfo The link information.
+   * \param link The link information.
    * \param slice The network slice.
    */
-  void SlicingMeterAdjust (Ptr<LinkInfo> lInfo, int sliceId);
+  void SlicingMeterAdjust (Ptr<LinkInfo> link, int sliceId);
 
   /**
    * Install the infrastructure inter-slicing OpenFlow meters.
-   * \param lInfo The link information.
+   * \param link The link information.
    * \param slice The network slice.
    */
-  void SlicingMeterInstall (Ptr<LinkInfo> lInfo, int sliceId);
+  void SlicingMeterInstall (Ptr<LinkInfo> link, int sliceId);
 
-  //Poiters to link infos
-  Ptr<LinkInfo> m_lInfoA;
-  Ptr<LinkInfo> m_lInfoB;
   DataRate              m_extraStep;      //!< Extra adjustment step.
   DataRate              m_guardStep;      //!< Dynamic slice link guard.
   DataRate              m_meterStep;      //!< Meter adjustment step.
   SliceMode             m_sliceMode;      //!< Inter-slicing operation mode.
   Time                  m_sliceTimeout;   //!< Dynamic slice timeout interval.
   OpMode                m_spareUse;       //!< Spare bit rate sharing mode.
-
-  size_t m_numberSlices;
+  SliceInfoList_t       m_slicesAll;      //!< All slices.
+  SliceInfoList_t       m_slicesSha;      //!< Slices sharing bandwidth
 };
 
 } // namespace ns3
