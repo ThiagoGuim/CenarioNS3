@@ -420,7 +420,7 @@ LinkInfo::NotifyTxPacket (std::string context, Ptr<const Packet> packet)
     }
   else
     {
-      NS_LOG_WARN ("GTPU packet tag not found for packet " << packet);
+      NS_LOG_WARN ("Packet tag not found for packet " << packet);
     }
 }
 
