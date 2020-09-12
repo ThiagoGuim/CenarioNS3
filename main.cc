@@ -32,6 +32,7 @@
 #include "infrastructure/controller.h"
 #include "application/udp-peer-helper.h"
 #include "metadata/slice-info.h"
+#include "statistics/network-statistics.h"
 
 using namespace ns3;
 
@@ -331,6 +332,9 @@ main (int argc, char *argv[])
   NS_LOG_INFO ("Simulating...");
   EnableProgress (progress);
 
+  // Create the network statistics object for bandwidth and traffic monitoring.
+  Ptr<NetworkStatistics> statistics = CreateObject<NetworkStatistics> ();
+
   TimeValue timeValue;
   GlobalValue::GetValueByName ("SimTime", timeValue);
   Time stopAt = timeValue.Get () + MilliSeconds (100);
@@ -340,6 +344,10 @@ main (int argc, char *argv[])
 
   // Finish the simulation.
   Simulator::Destroy ();
+
+  // Closing output statistic files.
+  statistics->Dispose ();
+  statistics = 0;
 
   // Print the final status message.
   BooleanValue cerrValue;
