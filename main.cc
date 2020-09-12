@@ -171,6 +171,9 @@ main (int argc, char *argv[])
   // Create the OpenFlow channel.
   of13Helper->CreateOpenFlowChannels ();
 
+  // Enable OpenFlow switch statistics.
+  of13Helper->EnableDatapathStats (outputPrefix.str () + "switch-stats", true);
+
   // PCAP tracing on the OpenFlow network only.
   if (trace)
     {
