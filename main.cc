@@ -66,7 +66,6 @@ void EnableProgress     (int);
 void EnableVerbose      (bool);
 void EnableOfsLogs      (bool);
 void CreateAnimation    (bool);
-void SliceFactoryParse  (std::string, ObjectFactory&);
 
 /*****************************************************************************/
 int
@@ -214,10 +213,11 @@ main (int argc, char *argv[])
         }
 
       // Create the slice info object from pre-configured factory.
-      ObjectFactory sliceFac;
-      SliceFactoryParse (lineBuffer, sliceFac);
-      sliceFac.Set ("SliceId", UintegerValue (++sliceCounter));
-      Ptr<SliceInfo> slice = sliceFac.Create<SliceInfo> ();
+      std::istringstream iss (lineBuffer);
+      ObjectFactory sliceFactory;
+      iss >> sliceFactory;
+      sliceFactory.Set ("SliceId", UintegerValue (++sliceCounter));
+      Ptr<SliceInfo> slice = sliceFactory.Create<SliceInfo> ();
 
       sumQuota += slice->GetQuota ();
       NS_ASSERT_MSG (sumQuota <= 100, "Quota exceeded");
@@ -356,63 +356,6 @@ main (int argc, char *argv[])
 }
 /*****************************************************************************/
 
-
-void
-SliceFactoryParse (std::string str, ObjectFactory &factory)
-{
-  std::string::size_type lbracket, rbracket;
-  lbracket = str.find ("[");
-  rbracket = str.find ("]");
-  if (lbracket == std::string::npos && rbracket == std::string::npos)
-    {
-      factory.SetTypeId (str);
-      return;
-    }
-  if (lbracket == std::string::npos || rbracket == std::string::npos)
-    {
-      return;
-    }
-  NS_ASSERT (lbracket != std::string::npos);
-  NS_ASSERT (rbracket != std::string::npos);
-  std::string tid = str.substr (0, lbracket);
-  std::string parameters = str.substr (lbracket + 1, rbracket - (lbracket + 1));
-  factory.SetTypeId (tid);
-  std::string::size_type cur;
-  cur = 0;
-  while (cur != parameters.size ())
-    {
-      std::string::size_type equal = parameters.find ("=", cur);
-      if (equal == std::string::npos)
-        {
-          break;
-        }
-      else
-        {
-          std::string name = parameters.substr (cur, equal - cur);
-          struct TypeId::AttributeInformation info;
-          if (!factory.GetTypeId ().LookupAttributeByName (name, &info))
-            {
-              break;
-            }
-          else
-            {
-              std::string::size_type next = parameters.find ("|", cur);
-              std::string value;
-              if (next == std::string::npos)
-                {
-                  value = parameters.substr (equal + 1, parameters.size () - (equal + 1));
-                  cur = parameters.size ();
-                }
-              else
-                {
-                  value = parameters.substr (equal + 1, next - (equal + 1));
-                  cur = next + 1;
-                }
-              factory.Set (name, StringValue (value));
-            }
-        }
-    }
-}
 
 void
 CreateAnimation (bool animation)
