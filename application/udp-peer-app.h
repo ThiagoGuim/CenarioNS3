@@ -69,6 +69,12 @@ private:
    */
   void SendPacket (void);
 
+  /** Trace source fired when a packet arrives at this application. */
+  TracedCallback<Ptr<const Packet> > m_rxTrace;
+
+  /** Trace source fired when a packet leaves this application. */
+  TracedCallback<Ptr<const Packet> > m_txTrace;
+
   Ptr<Socket>                 m_localSocket;    //!< Local socket.
   uint16_t                    m_localPort;      //!< Local port.
   Address                     m_peerAddress;    //!< Peer address.

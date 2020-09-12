@@ -80,6 +80,13 @@ UdpPeerApp::GetTypeId (void)
                    MakeEnumAccessor (&UdpPeerApp::m_qosType),
                    MakeEnumChecker (QosType::NON, QosTypeStr (QosType::NON),
                                     QosType::GBR, QosTypeStr (QosType::GBR)))
+
+    .AddTraceSource ("RxPkt", "Trace source for received packets.",
+                     MakeTraceSourceAccessor (&UdpPeerApp::m_rxTrace),
+                     "ns3::Packet::TracedCallback")
+    .AddTraceSource ("TxPkt", "Trace source for transmitted packets.",
+                     MakeTraceSourceAccessor (&UdpPeerApp::m_txTrace),
+                     "ns3::Packet::TracedCallback")
   ;
   return tid;
 }
@@ -153,6 +160,7 @@ UdpPeerApp::ReadPacket (Ptr<Socket> socket)
   NS_LOG_FUNCTION (this << socket);
 
   Ptr<Packet> packet = socket->Recv ();
+  m_rxTrace (packet);
   NS_LOG_DEBUG ("RX packet with " << packet->GetSize () << " bytes.");
 }
 
@@ -164,6 +172,7 @@ UdpPeerApp::SendPacket ()
   Ptr<Packet> packet = Create<Packet> (m_pktSizeRng->GetInteger ());
   SliceTag tag (m_sliceId, m_qosType);
   packet->AddPacketTag (tag);
+  m_txTrace (packet);
 
   int bytes = m_localSocket->Send (packet);
   if (bytes == static_cast<int> (packet->GetSize ()))
