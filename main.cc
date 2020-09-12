@@ -190,7 +190,7 @@ main (int argc, char *argv[])
   // --------------------------------------------------------------------------
   // Configuring the network slices
   // --------------------------------------------------------------------------
-  NS_LOG_INFO ("Creating the slices network...");
+  NS_LOG_INFO ("Creating the network slices...");
   int sliceCounter = 0;
   int sumQuota = 0;
 
@@ -223,15 +223,16 @@ main (int argc, char *argv[])
       NS_ASSERT_MSG (sumQuota <= 100, "Quota exceeded");
 
       // Create the containers for all nodes, ports, devices, and IP addr.
-      NodeContainer hostsA, hostsB, hostsC;
+      NodeContainer hostsA, hostsB, hostsC, hostsAB;
       PortsList_t switchPortsA, switchPortsB, switchPortsC;
-      NetDeviceContainer hostDevicesA, hostDevicesB, hostDevicesC;
-      Ipv4InterfaceContainer hostIpIfacesA, hostIpIfacesB, hostIpIfacesC;
+      NetDeviceContainer hostDevicesA, hostDevicesB, hostDevicesC, hostDevicesAB;
+      Ipv4InterfaceContainer hostIpIfacesAB, hostIpIfacesC;
 
       // Create the host nodes.
       hostsA.Create (slice->GetNumHostsA ());
       hostsB.Create (slice->GetNumHostsB ());
       hostsC.Create (slice->GetNumHostsC ());
+      hostsAB = NodeContainer (hostsA, hostsB);
 
       // Connect hosts to switches, saving ports and devices.
       for (size_t i = 0; i < hostsA.GetN (); i++)
@@ -252,6 +253,7 @@ main (int argc, char *argv[])
           hostDevicesC.Add (pairDevs.Get (0));
           switchPortsC.push_back (switchDevices.Get (2)->AddSwitchPort (pairDevs.Get (1)));
         }
+      hostDevicesAB = NetDeviceContainer (hostDevicesA, hostDevicesB);
 
       // Install the TCP/IP stack into hosts nodes
       InternetStackHelper internet;
@@ -270,8 +272,7 @@ main (int argc, char *argv[])
       // Hosts on switches A and B with IP address 10.SLICEID.1.HOSTNUM
       Ipv4AddressHelper ipv4Helper;
       ipv4Helper.SetBase ("10.0.0.0", "255.0.0.0", baseAddressAB);
-      hostIpIfacesA = ipv4Helper.Assign (hostDevicesA);
-      hostIpIfacesB = ipv4Helper.Assign (hostDevicesB);
+      hostIpIfacesAB = ipv4Helper.Assign (hostDevicesAB);
 
       // Hosts on switch C with IP address 10.SLICEID.2.HOSTNUM
       ipv4Helper.SetBase ("10.0.0.0", "255.0.0.0", baseAddressC);
@@ -290,20 +291,11 @@ main (int argc, char *argv[])
         {
           controllerApp->NotifyHost (switchPortsC.at (i), hostDevicesC.Get (i));
         }
-    }
-  slcFile.close ();
-
-  // Notify the controler about the network slices.
-  controllerApp->NotifySlices (SliceInfo::GetList ());
 
 
-  // --------------------------------------------------------------------------
-  // Configuring the applications
-  // --------------------------------------------------------------------------
-  NS_LOG_INFO ("Creating applications...");
-  /*
-  for (size_t i = 0; i < numberSlices; i++)
-    {
+      // --------------------------------------------------------------------------
+      // Configuring the applications for this slice
+      // --------------------------------------------------------------------------
       Ptr<ExponentialRandomVariable> startRng = CreateObject<ExponentialRandomVariable> ();
       startRng->SetAttribute ("Mean", DoubleValue (5));
 
@@ -319,11 +311,13 @@ main (int argc, char *argv[])
       // // Disable the traffic at the UDP server node.
       // appHelper->Set2ndAttribute ("PktInterval", StringValue ("ns3::ConstantRandomVariable[Constant=1000000]"));
 
-      appHelper->SetBothAttribute ("SliceId", UintegerValue (i));
-      appHelper->Install (sliceNodes[i][ALL_HOSTS], sliceNodes[i][SERVERS],
-                          sliceInterfaces[i][ALL_HOSTS], sliceInterfaces[i][SERVERS]);
+      appHelper->SetBothAttribute ("SliceId", UintegerValue (slice->GetSliceId ()));
+      appHelper->Install (hostsAB, hostsC, hostIpIfacesAB, hostIpIfacesC);
     }
-  */
+  slcFile.close ();
+
+  // Notify the controler about the network slices.
+  controllerApp->NotifySlices (SliceInfo::GetList ());
 
 
   // --------------------------------------------------------------------------
