@@ -74,6 +74,12 @@ public:
   //\}
 
   /**
+   * Get the number of slices.
+   * \return The number of slices
+   */
+  static size_t GetNSlices (void);
+
+  /**
    * Get the list of slice information.
    * \return The const reference to the list of slice information.
    */

@@ -196,6 +196,12 @@ SliceInfo::NotifyConstructionCompleted (void)
   Object::NotifyConstructionCompleted ();
 }
 
+size_t
+SliceInfo::GetNSlices (void)
+{
+  return m_sliceInfoList.size ();
+}
+
 const SliceInfoList_t&
 SliceInfo::GetList (void)
 {
