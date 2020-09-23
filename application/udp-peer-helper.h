@@ -50,6 +50,7 @@ public:
   //\{
   uint16_t GetNumApps     (void) const;
   Time     GetStartOffset (void) const;
+  bool     GetFullDuplex  (void) const;
   //\}
 
   /**
@@ -118,6 +119,7 @@ private:
   ObjectFactory m_app1stFactory;   //!< Application factory.
   ObjectFactory m_app2ndFactory;   //!< Application factory.
 
+  bool                        m_fullDuplex;   //!< Traffic in both directions.
   uint16_t                    m_numApps;      //!< Number of apps per host.
   Time                        m_startOff;     //!< Start offset time.
   Time                        m_startTime;    //!< The cummulative start time.

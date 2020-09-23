@@ -68,6 +68,10 @@ UdpPeerHelper::GetTypeId (void)
                    StringValue ("ns3::NormalRandomVariable[Mean=30|Variance=100]"),
                    MakePointerAccessor (&UdpPeerHelper::m_lengthRng),
                    MakePointerChecker <RandomVariableStream> ())
+    .AddAttribute ("FullDuplex", "A boolean value to determine the traffic direction.",
+                   BooleanValue (false),
+                   MakeBooleanAccessor (&UdpPeerHelper::m_fullDuplex),
+                   MakeBooleanChecker ())
   ;
   return tid;
 }
@@ -82,6 +86,12 @@ Time
 UdpPeerHelper::GetStartOffset (void) const
 {
   return m_startOff;
+}
+
+bool     
+UdpPeerHelper::GetFullDuplex  (void) const
+{
+  return m_fullDuplex;
 }
 
 void
@@ -190,7 +200,12 @@ UdpPeerHelper::InstallApp (
   node2nd->AddApplication (app2nd);
 
   Simulator::Schedule (startTime, &UdpPeerApp::StartTraffic, app1st);
-  Simulator::Schedule (startTime, &UdpPeerApp::StartTraffic, app2nd);
+
+  if (m_fullDuplex)
+    {
+      Simulator::Schedule (startTime, &UdpPeerApp::StartTraffic, app2nd);
+    }
+  
   Simulator::Schedule (startTime + lengthTime, &UdpPeerApp::StopTraffic, app1st);
   Simulator::Schedule (startTime + lengthTime, &UdpPeerApp::StopTraffic, app2nd);
 
