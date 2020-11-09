@@ -1,1 +1,0 @@
-ns3::SliceInfo[Priority=3|Quota=10|HostsA=3|HostsB=2]

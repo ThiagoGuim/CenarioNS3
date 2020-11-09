@@ -1,0 +1,6 @@
+default ns3::Controller::ExtraStep "4Mbps"
+default ns3::Controller::GuardStep "5Mbps"
+default ns3::Controller::MeterStep "1Mbps"
+default ns3::Controller::SliceMode "dynamic"
+default ns3::Controller::SliceTimeout "10s"
+default ns3::Controller::SpareUse "on"
