@@ -149,7 +149,7 @@ main (int argc, char *argv[])
   PortsList_t switchPorts;
 
   CsmaHelper csmaHelper;
-  csmaHelper.SetChannelAttribute ("DataRate", DataRateValue (DataRate ("100Mbps")));
+  csmaHelper.SetChannelAttribute ("DataRate", DataRateValue (DataRate ("1Gbps")));
   csmaHelper.SetChannelAttribute ("Delay", TimeValue (MilliSeconds (0)));
 
   // Connect switch A to switch B
