@@ -1,8 +1,4 @@
-# CenarioNS3
-Building NS3 scenario to make tests about traffic flows.
+# simNS3
 
 ## Arquivos
-
-O pseudocógido especificado do algoritmo está no arquivo TCC_Exatas_Thiago___algoritmo.pdf.
-
-Exemplo de como são configurados os slices e os parâmetros do algoritmo estão nos arquivos 4slicesDYNAMIC.slices e 4slicesDYNAMIC.topo respectivamente.
+Códigos referentes à implementação no simulador ns-3 para o TCC de ciência da computação.
