@@ -1,0 +1,4 @@
+ns3::SliceInfo[AppsConfig=({35,1200,10,250,140,0,0,BE,0,};{5,600,10,250,140,0,0,BE,2,};)|NumHostsA=4|NumHostsB=0|Quota=25|Sharing=on|Priority=3]
+ns3::SliceInfo[AppsConfig=({15,1024,20,0,140,0,1,BE,0,};{40,1024,20,0,140,0,1,BE,1,};{5,600,20,0,140,0,1,BE,2,};)|NumHostsA=9|NumHostsB=0|Quota=20|Sharing=on|Priority=2]
+ns3::SliceInfo[AppsConfig=({100,600,20,0,20,0,0,BE,2,};|NumHostsA=15|NumHostsB=0|Quota=20|Sharing=on|Priority=1]
+ns3::SliceInfo[AppsConfig=({45,1024,10,0,20,0,0,BE,1,};)|NumHostsA=20|NumHostsB=0|Quota=25|Sharing=on|Priority=1]

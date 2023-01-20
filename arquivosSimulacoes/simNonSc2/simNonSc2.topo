@@ -1,0 +1,8 @@
+default ns3::Controller::ExtraStep "12Mbps"
+default ns3::Controller::GuardStep "5Mbps"
+default ns3::Controller::MeterStep "2Mbps"
+default ns3::Controller::SliceMode "none"
+default ns3::Controller::SliceTimeout "20s"
+default ns3::Controller::SpareUse "on"
+default ns3::Controller::ScenarioConfig "2"
+default ns3::OFSwitch13Port::QueueFactory "ns3::Scenario2queues"
